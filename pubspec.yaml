@@ -1,0 +1,33 @@
+name: arp_scout
+description: "ARP & Subnet Scout (L2/L3 Discovery) desktop application built with Flutter and SQLite."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.5+1
+  sqlite3: ^3.7.1
+  sqlite3_flutter_libs: ^0.6.0+eol
+  path_provider: ^2.1.6
+  path: ^1.9.1
+  file_picker: ^13.1.0
+  csv: ^8.0.0
+  intl: ^0.20.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/app_icon.png
