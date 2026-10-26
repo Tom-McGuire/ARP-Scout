@@ -52,24 +52,86 @@ class SubnetScannerService {
     }
   }
 
-  /// Generates a preview CLI command string for the inspector / toolbar.
+  /// Resolves a system networking binary using absolute System32 paths on Windows
+  /// to prevent current-working-directory DLL/binary hijacking.
+  static String _resolveSystemBinary(String binaryName) {
+    if (Platform.isWindows) {
+      final sysRoot = Platform.environment['SystemRoot'] ?? r'C:\Windows';
+      final candidate = '$sysRoot\\System32\\$binaryName.exe';
+      if (File(candidate).existsSync()) {
+        return candidate;
+      }
+    }
+    return binaryName;
+  }
+
+  /// Validates that [input] is a safe, well-formed CIDR, IP range, or IPv4 address.
+  static bool isValidTargetSpecification(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return false;
+    if (!RegExp(r'^[0-9./-]+$').hasMatch(trimmed)) return false;
+    return expandTargetSubnet(trimmed, maxHosts: 1).isNotEmpty;
+  }
+
+  /// Generates a sanitized preview CLI command string for the inspector / toolbar.
   static String buildCliPreviewCommand(String subnetCidr, {bool arpOnly = false}) {
+    final safeTarget = isValidTargetSpecification(subnetCidr)
+        ? subnetCidr.trim()
+        : '192.168.1.0/24';
+
     if (Platform.isWindows) {
       if (arpOnly) return 'arp -a';
-      return 'for /L %i in (1,1,254) do @start /b ping -n 1 -w 250 ${_basePrefix(subnetCidr)}.%i >nul & arp -a';
+      return 'for /L %i in (1,1,254) do @start /b ping -n 1 -w 250 ${_basePrefix(safeTarget)}.%i >nul & arp -a';
     } else {
       if (arpOnly) return 'ip neigh show || arp -an';
-      return 'fping -a -g $subnetCidr 2>/dev/null; arp -an';
+      return 'fping -a -g $safeTarget 2>/dev/null; arp -an';
     }
   }
 
   static String _basePrefix(String cidr) {
     final ipPart = cidr.split('/').first.split('-').first.trim();
-    final parts = ipPart.split('.');
-    if (parts.length == 4) {
+    if (ArpHostRecord.isValidIpv4(ipPart)) {
+      final parts = ipPart.split('.');
       return '${parts[0]}.${parts[1]}.${parts[2]}';
     }
     return '192.168.1';
+  }
+
+  /// Checks whether [ip] belongs to [targetSubnet] (supporting arbitrary CIDR prefixes `/16`..`/32`,
+  /// explicit ranges, or single IPs).
+  static bool isIpInTargetSubnet(
+    String ip,
+    String targetSubnet,
+    Set<String> expandedTargetIps,
+  ) {
+    if (!ArpHostRecord.isValidIpv4(ip)) return false;
+    if (expandedTargetIps.contains(ip)) return true;
+
+    final trimmed = targetSubnet.trim();
+    if (trimmed.contains('/')) {
+      final parts = trimmed.split('/');
+      if (parts.length != 2) return false;
+      final baseIp = parts[0].trim();
+      final prefix = int.tryParse(parts[1].trim());
+      if (!ArpHostRecord.isValidIpv4(baseIp) ||
+          prefix == null ||
+          prefix < 16 ||
+          prefix > 32) {
+        return false;
+      }
+      if (prefix == 32) return ip == baseIp;
+      final hostBits = 32 - prefix;
+      final mask = (0xFFFFFFFF << hostBits) & 0xFFFFFFFF;
+      final ipNum = ArpHostRecord.ipv4ToInt(ip);
+      final netNum = ArpHostRecord.ipv4ToInt(baseIp) & mask;
+      final bcastNum = netNum | ((1 << hostBits) - 1);
+      if (prefix <= 30 && (ipNum == netNum || ipNum == bcastNum)) {
+        return false;
+      }
+      return (ipNum & mask) == netNum;
+    }
+
+    return false;
   }
 
   /// Parses a CIDR (e.g. 192.168.1.0/24), IP range (192.168.1.1-192.168.1.50 or 192.168.1.1-50),
@@ -84,7 +146,12 @@ class SubnetScannerService {
       if (parts.length != 2) return const [];
       final baseIp = parts[0].trim();
       final prefix = int.tryParse(parts[1].trim());
-      if (prefix == null || prefix < 16 || prefix > 32) return const [];
+      if (!ArpHostRecord.isValidIpv4(baseIp) ||
+          prefix == null ||
+          prefix < 16 ||
+          prefix > 32) {
+        return const [];
+      }
       final ipNum = ArpHostRecord.ipv4ToInt(baseIp);
       if (ipNum == 0 && baseIp != '0.0.0.0') return const [];
 
@@ -104,17 +171,19 @@ class SubnetScannerService {
       );
     }
 
-    // 2. Check range notation: 192.168.1.1-192.168.1.100 or 192.168.1.1-100
+    // 2. Check range notation: 192.168.1.1-192.168.1.100 or 192.168.1.1-50
     if (trimmed.contains('-')) {
       final parts = trimmed.split('-');
       if (parts.length != 2) return const [];
       final startStr = parts[0].trim();
       final endStr = parts[1].trim();
+      if (!ArpHostRecord.isValidIpv4(startStr)) return const [];
       final startNum = ArpHostRecord.ipv4ToInt(startStr);
       if (startNum == 0) return const [];
 
       int endNum;
       if (endStr.contains('.')) {
+        if (!ArpHostRecord.isValidIpv4(endStr)) return const [];
         endNum = ArpHostRecord.ipv4ToInt(endStr);
       } else {
         final lastOctet = int.tryParse(endStr);
@@ -136,7 +205,7 @@ class SubnetScannerService {
     }
 
     // 3. Single IPv4 address
-    if (RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(trimmed)) {
+    if (ArpHostRecord.isValidIpv4(trimmed)) {
       return [trimmed];
     }
 
@@ -149,14 +218,15 @@ class SubnetScannerService {
     var currentInterface = 'System ARP';
 
     final lines = rawOutput.split(RegExp(r'\r?\n'));
-    // Windows Interface header: Interface: 192.168.1.25 --- 0xe
+    // Windows Interface header (locale-independent via `--- 0x...` or `Interface:`):
+    // e.g. "Interface: 192.168.1.25 --- 0xe" or "Schnittstelle: 192.168.1.25 --- 0xe"
     final winIfaceRegex = RegExp(
-      r'Interface:\s+(\d{1,3}(?:\.\d{1,3}){3})',
+      r'(?:Interface:\s*(\d{1,3}(?:\.\d{1,3}){3})|(\d{1,3}(?:\.\d{1,3}){3})\s+---\s+0x[0-9a-fA-F]+)',
       caseSensitive: false,
     );
     // Windows ARP entry: 192.168.1.1   00-1b-54-11-22-33   dynamic
     final winEntryRegex = RegExp(
-      r'^\s*(\d{1,3}(?:\.\d{1,3}){3})\s+([0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5})\s+(\w+)',
+      r'^\s*(\d{1,3}(?:\.\d{1,3}){3})\s+([0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5})\s+(\S+)',
     );
     // Unix/macOS `arp -an` entry: ? (192.168.1.1) at 00:1b:54:11:22:33 [ether] on en0
     final unixArpRegex = RegExp(
@@ -165,7 +235,7 @@ class SubnetScannerService {
     );
     // Linux `ip neigh` entry: 192.168.1.1 dev eth0 lladdr 00:1b:54:11:22:33 REACHABLE
     final ipNeighRegex = RegExp(
-      r'^(\d{1,3}(?:\.\d{1,3}){3})\s+dev\s+(\S+)\s+lladdr\s+([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})\s+(\S+)',
+      r'^(\d{1,3}(?:\.\d{1,3}){3})\s+(?:dev\s+(\S+)\s+)?lladdr\s+([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})\s+(\S+)',
       caseSensitive: false,
     );
 
@@ -175,16 +245,21 @@ class SubnetScannerService {
 
       final ifaceMatch = winIfaceRegex.firstMatch(trimmed);
       if (ifaceMatch != null) {
-        currentInterface = ifaceMatch.group(1)!;
-        continue;
+        final candidateIp = ifaceMatch.group(1) ?? ifaceMatch.group(2);
+        if (candidateIp != null && ArpHostRecord.isValidIpv4(candidateIp)) {
+          currentInterface = candidateIp;
+          continue;
+        }
       }
 
       final winMatch = winEntryRegex.firstMatch(line);
       if (winMatch != null) {
         final ip = winMatch.group(1)!;
         final mac = ArpHostRecord.normalizeMac(winMatch.group(2)!);
-        final type = winMatch.group(3)!.toLowerCase();
-        if (!_isIgnoredBroadcastOrMulticast(ip, mac)) {
+        final rawType = winMatch.group(3)!.toLowerCase();
+        final type = _normalizeArpType(rawType);
+        if (ArpHostRecord.isValidIpv4(ip) &&
+            !_isIgnoredBroadcastOrMulticast(ip, mac)) {
           entries.add(
             ParsedArpEntry(
               ipAddress: ip,
@@ -203,7 +278,8 @@ class SubnetScannerService {
         final ip = unixMatch.group(1)!;
         final mac = _normalizeVariableHexMac(unixMatch.group(2)!);
         final dev = unixMatch.group(3)!;
-        if (!_isIgnoredBroadcastOrMulticast(ip, mac)) {
+        if (ArpHostRecord.isValidIpv4(ip) &&
+            !_isIgnoredBroadcastOrMulticast(ip, mac)) {
           entries.add(
             ParsedArpEntry(
               ipAddress: ip,
@@ -220,10 +296,11 @@ class SubnetScannerService {
       final neighMatch = ipNeighRegex.firstMatch(line);
       if (neighMatch != null) {
         final ip = neighMatch.group(1)!;
-        final dev = neighMatch.group(2)!;
+        final dev = neighMatch.group(2) ?? currentInterface;
         final mac = ArpHostRecord.normalizeMac(neighMatch.group(3)!);
         final state = neighMatch.group(4)!.toLowerCase();
-        if (!_isIgnoredBroadcastOrMulticast(ip, mac)) {
+        if (ArpHostRecord.isValidIpv4(ip) &&
+            !_isIgnoredBroadcastOrMulticast(ip, mac)) {
           entries.add(
             ParsedArpEntry(
               ipAddress: ip,
@@ -238,6 +315,12 @@ class SubnetScannerService {
     }
 
     return entries;
+  }
+
+  static String _normalizeArpType(String rawType) {
+    if (rawType.contains('dyn')) return 'dynamic';
+    if (rawType.contains('stat') || rawType.contains('perm')) return 'static';
+    return rawType;
   }
 
   static String _normalizeVariableHexMac(String raw) {
@@ -266,11 +349,22 @@ class SubnetScannerService {
     return false;
   }
 
-  /// Reads the local operating system ARP table (`arp -a` or `ip neigh`).
+  /// Reads the local operating system ARP table (`arp -a` on Windows, `ip neigh` / `arp -an` on Linux/macOS).
   Future<List<ParsedArpEntry>> readSystemArpCache() async {
+    if (Platform.isLinux) {
+      try {
+        final ipNeighResult = await Process.run('ip', const ['neigh', 'show']);
+        if (ipNeighResult.exitCode == 0) {
+          final parsed = parseArpTableOutput(ipNeighResult.stdout.toString());
+          if (parsed.isNotEmpty) return parsed;
+        }
+      } catch (_) {}
+    }
+
     try {
+      final arpBin = _resolveSystemBinary('arp');
       final result = await Process.run(
-        Platform.isWindows ? 'arp' : 'arp',
+        arpBin,
         Platform.isWindows ? const ['-a'] : const ['-an'],
       );
       if (result.exitCode == 0) {
@@ -282,24 +376,25 @@ class SubnetScannerService {
 
   /// Executes a single fast ICMP echo probe to trigger kernel ARP resolution and measure RTT/TTL.
   Future<IcmpProbeResult> probeHostIcmp(String ip, {int timeoutMs = 300}) async {
-    if (_isCancelled) {
+    if (_isCancelled || !ArpHostRecord.isValidIpv4(ip)) {
       return IcmpProbeResult(ip: ip, reachable: false);
     }
 
     Process? proc;
     try {
+      final pingBin = _resolveSystemBinary('ping');
       final args = Platform.isWindows
           ? ['-n', '1', '-w', '$timeoutMs', ip]
           : [
               '-c',
               '1',
-              Platform.isMacOS ? '-W' : '-W',
+              '-W',
               Platform.isMacOS ? '$timeoutMs' : '1',
               ip,
             ];
 
       final sw = Stopwatch()..start();
-      proc = await Process.start('ping', args);
+      proc = await Process.start(pingBin, args);
       _activeProcesses.add(proc);
 
       final stdoutFuture = proc.stdout.transform(const SystemEncoding().decoder).join();
@@ -435,18 +530,35 @@ class SubnetScannerService {
     }
 
     final targetIpSet = targetIps.toSet();
-    final allCandidateIps = <String>{
+    final candidateIpList = <String>{
       ...icmpResults.keys,
       ...arpByIp.keys.where((ip) {
         if (arpCacheOnly || targetIpSet.isEmpty) return true;
-        return targetIpSet.contains(ip) ||
-            ip.startsWith(_basePrefix(targetSubnet));
+        return isIpInTargetSubnet(ip, targetSubnet, targetIpSet);
       }),
-    };
+    }.toList();
+
+    // Resolve reverse DNS concurrently in batches rather than sequentially per host
+    final hostnamesByIp = <String, String?>{};
+    for (var i = 0; i < candidateIpList.length; i += concurrency) {
+      if (_isCancelled) break;
+      final end = (i + concurrency < candidateIpList.length)
+          ? i + concurrency
+          : candidateIpList.length;
+      final batch = candidateIpList.sublist(i, end);
+      final resolved = await Future.wait(
+        batch.map((ip) async => MapEntry(ip, await _tryReverseDns(ip))),
+      );
+      for (final entry in resolved) {
+        hostnamesByIp[entry.key] = entry.value;
+      }
+    }
+
+    if (_isCancelled) return const [];
 
     final records = <ArpHostRecord>[];
 
-    for (final ip in allCandidateIps) {
+    for (final ip in candidateIpList) {
       if (_isCancelled) break;
       final l2List = arpByIp[ip] ?? const [];
       final l3 = icmpResults[ip];
@@ -482,18 +594,13 @@ class SubnetScannerService {
         method = 'ICMP Sweep';
       }
 
-      String? hostname;
-      if (l3 != null || distinctMacs.isNotEmpty) {
-        hostname = await _tryReverseDns(ip);
-      }
-
       records.add(
         ArpHostRecord(
           ipAddress: ip,
           ipNumeric: ArpHostRecord.ipv4ToInt(ip),
           macAddress: primaryMac,
           vendor: vendor,
-          hostname: hostname,
+          hostname: hostnamesByIp[ip],
           subnet: targetSubnet,
           interfaceName: l2List.isNotEmpty
               ? '$interfaceName (${l2List.first.interfaceIp})'

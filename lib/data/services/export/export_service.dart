@@ -5,15 +5,24 @@ import 'package:file_picker/file_picker.dart';
 import '../../../domain/models/arp_host_record.dart';
 
 class ExportService {
+  static bool _isFormulaTrigger(String ch) {
+    return ch == '=' ||
+        ch == '+' ||
+        ch == '-' ||
+        ch == '@' ||
+        ch == '\t' ||
+        ch == '\r' ||
+        ch == '\n' ||
+        ch == '|';
+  }
+
   static String sanitizeForCsv(String? value) {
     if (value == null || value.isEmpty) return '';
     final firstChar = value[0];
-    if (firstChar == '=' ||
-        firstChar == '+' ||
-        firstChar == '-' ||
-        firstChar == '@' ||
-        firstChar == '\t' ||
-        firstChar == '\r') {
+    final trimmed = value.trimLeft();
+    final firstNonSpace = trimmed.isNotEmpty ? trimmed[0] : '';
+    if (_isFormulaTrigger(firstChar) ||
+        (firstNonSpace.isNotEmpty && _isFormulaTrigger(firstNonSpace))) {
       return "'$value";
     }
     return value;

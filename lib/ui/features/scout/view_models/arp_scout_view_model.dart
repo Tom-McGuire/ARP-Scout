@@ -168,9 +168,21 @@ class ArpScoutViewModel extends ChangeNotifier {
         },
       );
 
+      if (_repository.scannerService.isCancelled) {
+        _repository.cleanupCancelledSweep();
+        _refreshQuery();
+        return;
+      }
+
       if (results.isNotEmpty) {
         _repository.upsertBatch(results);
       }
+
+      _repository.reconcileSweepCompletion(
+        subnet: targetSubnet,
+        activeIps: results.map((r) => r.ipAddress).toSet(),
+        markMissingAsStale: !arpCacheOnly && targetIps.length > 1,
+      );
 
       _scanProgress = _scanProgress.copyWith(
         isScanning: false,
@@ -182,6 +194,7 @@ class ArpScoutViewModel extends ChangeNotifier {
       );
       _refreshQuery();
     } catch (e) {
+      _repository.cleanupCancelledSweep();
       _scanProgress = _scanProgress.copyWith(
         isScanning: false,
         currentPhase: 'Scan Failed',
@@ -191,17 +204,25 @@ class ArpScoutViewModel extends ChangeNotifier {
     }
   }
 
+  /// Dismisses any visible error alert banner.
+  void dismissError() {
+    if (_scanProgress.lastError == null) return;
+    _scanProgress = _scanProgress.copyWith(clearError: true);
+    notifyListeners();
+  }
+
   /// Stops an active scan and cancels any continuous watch timer.
   Future<void> stopScan() async {
     _watchTimer?.cancel();
     _watchTimer = null;
     await _repository.cancelActiveScan();
+    _repository.cleanupCancelledSweep();
     _scanProgress = _scanProgress.copyWith(
       isScanning: false,
       isContinuousWatch: false,
       currentPhase: 'Scan Stopped',
     );
-    notifyListeners();
+    _refreshQuery();
   }
 
   /// Toggles Continuous Watch Mode (periodic ARP/ICMP sweeps to catch intermittent IP conflicts).
@@ -392,9 +413,15 @@ class ArpScoutViewModel extends ChangeNotifier {
       );
       if (res != null) {
         _loadedFileName = res.fileName;
+        _scanProgress = _scanProgress.copyWith(clearError: true);
         _refreshQuery(notify: false);
       }
       return res;
+    } catch (e) {
+      _scanProgress = _scanProgress.copyWith(
+        lastError: 'CSV Import failed: $e',
+      );
+      return null;
     } finally {
       _isImporting = false;
       notifyListeners();
@@ -414,9 +441,10 @@ class ArpScoutViewModel extends ChangeNotifier {
     _totalHostCount = _repository.countHosts(_filter);
     _unfilteredTotalCount = _repository.totalUnfilteredCount();
     _statusCounts = _repository.getStatusCounts();
+    final currentLimit = _hosts.length > pageSize ? _hosts.length : pageSize;
     _hosts = _repository.queryHosts(
       offset: 0,
-      limit: pageSize,
+      limit: currentLimit,
       filter: _filter,
     );
 

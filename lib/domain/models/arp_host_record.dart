@@ -78,13 +78,29 @@ class ArpHostRecord {
     return parts.join(':');
   }
 
+  /// Validates whether [ip] is a strictly well-formed dotted-quad IPv4 address (octets 0..255).
+  static bool isValidIpv4(String ip) {
+    final parts = ip.trim().split('.');
+    if (parts.length != 4) return false;
+    for (final part in parts) {
+      if (part.isEmpty || part.length > 3) return false;
+      final octet = int.tryParse(part);
+      if (octet == null || octet < 0 || octet > 255) return false;
+      if (part.length > 1 && part.startsWith('0')) return false;
+    }
+    return true;
+  }
+
   /// Converts an IPv4 string (e.g., 192.168.1.10) to a 32-bit integer for numeric sorting.
+  /// Returns 0 if [ip] is not a valid IPv4 address.
   static int ipv4ToInt(String ip) {
     final parts = ip.trim().split('.');
     if (parts.length != 4) return 0;
     var result = 0;
     for (final part in parts) {
-      final octet = int.tryParse(part) ?? 0;
+      if (part.isEmpty || part.length > 3) return 0;
+      final octet = int.tryParse(part);
+      if (octet == null || octet < 0 || octet > 255) return 0;
       result = (result << 8) | (octet & 0xFF);
     }
     return result;

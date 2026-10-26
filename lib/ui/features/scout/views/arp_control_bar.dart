@@ -665,9 +665,10 @@ class _ArpControlBarState extends State<ArpControlBar> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Copy error message',
                     icon: const Icon(
-                      Icons.close,
-                      size: 14,
+                      Icons.copy,
+                      size: 13,
                       color: Colors.white70,
                     ),
                     padding: EdgeInsets.zero,
@@ -680,6 +681,21 @@ class _ArpControlBarState extends State<ArpControlBar> {
                         ClipboardData(text: progress.lastError!),
                       );
                     },
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: 'Dismiss error banner',
+                    icon: const Icon(
+                      Icons.close,
+                      size: 14,
+                      color: Colors.white70,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 22,
+                      minHeight: 22,
+                    ),
+                    onPressed: () => vm.dismissError(),
                   ),
                 ],
               ),
@@ -822,6 +838,8 @@ class _ArpControlBarState extends State<ArpControlBar> {
         ],
       ),
     );
+
+    controller.dispose();
 
     if (result != null && result.isNotEmpty) {
       vm.updateTargetSubnet(result);

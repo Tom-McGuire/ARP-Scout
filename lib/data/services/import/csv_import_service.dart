@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../domain/models/arp_host_record.dart';
@@ -18,6 +19,10 @@ class CsvImportResult {
 }
 
 class CsvImportService {
+  static const int maxFileSizeBytes = 10 * 1024 * 1024; // 10 MB cap
+  static const int maxImportRows = 50000;
+  static const int maxFieldLength = 512;
+
   static Future<CsvImportResult?> pickAndParseCsv() async {
     final pickedFiles = await FilePicker.pickFiles(
       dialogTitle: 'Open ARP / Subnet CSV File',
@@ -32,12 +37,43 @@ class CsvImportService {
     return parseCsvFile(File(path));
   }
 
-  static Future<CsvImportResult> parseCsvFile(File file) async {
+  static Future<CsvImportResult> parseCsvFile(
+    File file, {
+    int maxBytes = maxFileSizeBytes,
+    int maxRows = maxImportRows,
+  }) async {
+    final fileSize = await file.length();
+    if (fileSize > maxBytes) {
+      final sizeMb = (fileSize / (1024 * 1024)).toStringAsFixed(1);
+      final limitMb = (maxBytes / (1024 * 1024)).toStringAsFixed(0);
+      throw FormatException(
+        'CSV file is too large ($sizeMb MB). Maximum allowed size is $limitMb MB.',
+      );
+    }
+
+    final fileName = file.uri.pathSegments.isNotEmpty
+        ? file.uri.pathSegments.last
+        : file.path;
     final content = await file.readAsString();
+
+    return Isolate.run(
+      () => parseCsvContent(
+        content,
+        fileName: fileName,
+        maxRows: maxRows,
+      ),
+    );
+  }
+
+  static CsvImportResult parseCsvContent(
+    String content, {
+    String fileName = 'import.csv',
+    int maxRows = maxImportRows,
+  }) {
     final rows = Csv().decode(content);
     if (rows.isEmpty) {
       return CsvImportResult(
-        fileName: file.uri.pathSegments.last,
+        fileName: fileName,
         records: const [],
         skippedCount: 0,
       );
@@ -73,28 +109,33 @@ class CsvImportService {
     var skipped = 0;
 
     for (var i = startRow; i < rows.length; i++) {
+      if (records.length >= maxRows) {
+        skipped += (rows.length - i);
+        break;
+      }
+
       final row = rows[i];
       if (row.isEmpty) continue;
 
-      final ip = _cell(row, ipIdx);
-      if (!RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(ip)) {
+      final ip = _stripLeadingFormulaQuote(_cell(row, ipIdx));
+      if (!ArpHostRecord.isValidIpv4(ip)) {
         skipped++;
         continue;
       }
 
-      final rawMac = _cell(row, macIdx);
+      final rawMac = _stripLeadingFormulaQuote(_cell(row, macIdx));
       final normalizedMac = rawMac.isNotEmpty
           ? ArpHostRecord.normalizeMac(rawMac)
           : 'UNRESOLVED';
-      final rawVendor = _cell(row, vendorIdx);
+      final rawVendor = _stripLeadingFormulaQuote(_cell(row, vendorIdx));
       final vendor = rawVendor.isNotEmpty
           ? rawVendor
           : OuiLookupService.lookupVendor(normalizedMac);
-      final hostname = _cell(row, hostIdx);
+      final hostname = _stripLeadingFormulaQuote(_cell(row, hostIdx));
       final statusStr = _cell(row, statusIdx).toUpperCase();
       final rtt = double.tryParse(_cell(row, rttIdx));
       final ttl = int.tryParse(_cell(row, ttlIdx));
-      final notes = _cell(row, notesIdx);
+      final notes = _stripLeadingFormulaQuote(_cell(row, notesIdx));
 
       var status = HostStatus.online;
       if (statusStr.contains('CONFLICT')) {
@@ -133,7 +174,7 @@ class CsvImportService {
     }
 
     return CsvImportResult(
-      fileName: file.uri.pathSegments.last,
+      fileName: fileName,
       records: records,
       skippedCount: skipped,
     );
@@ -153,6 +194,17 @@ class CsvImportService {
 
   static String _cell(List<dynamic> row, int index) {
     if (index < 0 || index >= row.length) return '';
-    return row[index]?.toString().trim() ?? '';
+    final raw = row[index]?.toString().trim() ?? '';
+    if (raw.length > maxFieldLength) {
+      return raw.substring(0, maxFieldLength);
+    }
+    return raw;
+  }
+
+  static String _stripLeadingFormulaQuote(String value) {
+    if (value.length >= 2 && value.startsWith("'")) {
+      return value.substring(1);
+    }
+    return value;
   }
 }

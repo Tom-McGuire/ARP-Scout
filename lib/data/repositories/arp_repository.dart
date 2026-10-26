@@ -30,6 +30,22 @@ class ArpRepository {
     _dbService.upsertBatch(records);
   }
 
+  void cleanupCancelledSweep() {
+    _dbService.cleanupCancelledSweep();
+  }
+
+  void reconcileSweepCompletion({
+    required String subnet,
+    required Set<String> activeIps,
+    bool markMissingAsStale = true,
+  }) {
+    _dbService.reconcileSweepCompletion(
+      subnet: subnet,
+      activeIps: activeIps,
+      markMissingAsStale: markMissingAsStale,
+    );
+  }
+
   List<ArpHostRecord> queryHosts({
     int offset = 0,
     int limit = 500,

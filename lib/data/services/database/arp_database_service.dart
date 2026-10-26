@@ -74,7 +74,12 @@ class ArpDatabaseService {
 
     _db.execute('BEGIN TRANSACTION');
     try {
+      var hasResolvedMacInBatch = false;
       for (final incoming in records) {
+        if (_isValidResolvedMac(incoming.macAddress) ||
+            incoming.conflictingMacs.any(_isValidResolvedMac)) {
+          hasResolvedMacInBatch = true;
+        }
         final existingRows = _db.select(
           'SELECT * FROM arp_hosts WHERE ip_address = ? LIMIT 1',
           [incoming.ipAddress],
@@ -229,7 +234,9 @@ class ArpDatabaseService {
         }
       }
 
-      _recomputeAssociatedIpsForSharedMacs();
+      if (hasResolvedMacInBatch) {
+        _recomputeAssociatedIpsForSharedMacs();
+      }
       _db.execute('COMMIT');
     } catch (e) {
       _db.execute('ROLLBACK');
@@ -239,6 +246,52 @@ class ArpDatabaseService {
     _enforceRetentionCap();
   }
 
+  /// Cleans up temporary 'RESOLVING...' placeholders if a scan was cancelled mid-sweep.
+  void cleanupCancelledSweep() {
+    _db.execute(
+      "DELETE FROM arp_hosts WHERE mac_address = 'RESOLVING...'",
+    );
+  }
+
+  /// Reconciles table state after a full subnet sweep completes:
+  /// removes any leftover 'RESOLVING...' placeholders and transitions previously active
+  /// non-conflicting hosts in [subnet] that did not respond in [activeIps] to [HostStatus.stale].
+  void reconcileSweepCompletion({
+    required String subnet,
+    required Set<String> activeIps,
+    bool markMissingAsStale = true,
+  }) {
+    _db.execute('BEGIN TRANSACTION');
+    try {
+      _db.execute(
+        "DELETE FROM arp_hosts WHERE mac_address = 'RESOLVING...'",
+      );
+
+      if (markMissingAsStale && subnet.isNotEmpty) {
+        final rows = _db.select(
+          'SELECT id, ip_address, status FROM arp_hosts WHERE subnet = ?',
+          [subnet],
+        );
+        for (final row in rows) {
+          final id = row['id'] as int;
+          final ip = row['ip_address'] as String;
+          final statusCode = row['status'] as int;
+          if (!activeIps.contains(ip) &&
+              statusCode != HostStatus.conflict.code &&
+              statusCode != HostStatus.stale.code) {
+            _db.execute(
+              'UPDATE arp_hosts SET status = ? WHERE id = ?',
+              [HostStatus.stale.code, id],
+            );
+          }
+        }
+      }
+      _db.execute('COMMIT');
+    } catch (_) {
+      _db.execute('ROLLBACK');
+    }
+  }
+
   String _buildConflictNote(List<String> macs) {
     final formatted = macs
         .map((m) => '$m (${OuiLookupService.lookupVendor(m)})')
@@ -246,14 +299,12 @@ class ArpDatabaseService {
     return 'IP CONFLICT: Claimed by $formatted';
   }
 
-  /// Correlates hosts sharing the same physical MAC address across different IPs.
+  /// Correlates hosts sharing the same physical MAC address across different IPs,
+  /// and clears stale multi-homed associations when a MAC only claims a single IP.
   void _recomputeAssociatedIpsForSharedMacs() {
     final rows = _db.select('''
-      SELECT ip_address, mac_address
+      SELECT id, ip_address, mac_address, associated_ips
       FROM arp_hosts
-      WHERE length(mac_clean) = 12
-        AND mac_clean != '000000000000'
-        AND mac_clean != 'FFFFFFFFFFFF'
       ORDER BY ip_numeric ASC
     ''');
 
@@ -261,14 +312,29 @@ class ArpDatabaseService {
     for (final row in rows) {
       final ip = row['ip_address'] as String;
       final mac = row['mac_address'] as String;
-      macToIps.putIfAbsent(mac, () => []).add(ip);
+      if (_isValidResolvedMac(mac)) {
+        macToIps.putIfAbsent(mac, () => []).add(ip);
+      }
     }
 
-    for (final entry in macToIps.entries) {
-      if (entry.value.length > 1) {
+    for (final row in rows) {
+      final id = row['id'] as int;
+      final mac = row['mac_address'] as String;
+      final existingJson = row['associated_ips'] as String? ?? '[]';
+      final sharedIps = macToIps[mac];
+
+      if (sharedIps != null && sharedIps.length > 1) {
+        final nextJson = jsonEncode(sharedIps);
+        if (existingJson != nextJson) {
+          _db.execute(
+            'UPDATE arp_hosts SET associated_ips = ? WHERE id = ?',
+            [nextJson, id],
+          );
+        }
+      } else if (existingJson != '[]') {
         _db.execute(
-          'UPDATE arp_hosts SET associated_ips = ? WHERE mac_address = ?',
-          [jsonEncode(entry.value), entry.key],
+          "UPDATE arp_hosts SET associated_ips = '[]' WHERE id = ?",
+          [id],
         );
       }
     }
