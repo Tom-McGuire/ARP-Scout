@@ -1,9 +1,19 @@
-# Miscellaneous
+# Miscellaneous & OS
 *.class
 *.log
 *.pyc
 *.swp
+*.bak
+*.tmp
+*~
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 .atom/
 .build/
 .buildlog/
@@ -12,37 +22,79 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# Secrets, Environment & Keys
+.env
+.env.*
+*.key
+*.keystore
+*.jks
+*.pem
+key.properties
+
+# Local Release Archives & Bundles
+releases/
+Releases/
+*.tar.gz
+*.zip
+
+# IntelliJ / Android Studio
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# Visual Studio Code
+.vscode/
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# Visual Studio / MSVC Build & User Files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vcxproj.user
+*.vcxproj.filters.user
+Debug/
+Release/
+x64/
+x86/
+ARM64/
+*.[Cc]ache
+!*.[Cc]ache/
+
+# Flutter / Dart / Pub
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
+build/
 /build/
+coverage/
 /coverage/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-# Widget Preview related
+**/doc/api/
 .widget_preview/
+
+# Desktop Ephemeral Folders (Windows / macOS / Linux)
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
+**/Flutter/ephemeral/
+**/Pods/
+**/DerivedData/
+**/xcuserdata/
+**/dgph
+**/ios/Flutter/.last_build_id
+macos/Flutter/Generated.xcconfig
+macos/Flutter/flutter_export_environment.sh
+
+# Android (if added in future)
+android/app/debug/
+android/app/profile/
+android/app/release/
+.cxx/
+local.properties
+
+# Symbolication & Obfuscation
+app.*.symbols
+app.*.map.json
