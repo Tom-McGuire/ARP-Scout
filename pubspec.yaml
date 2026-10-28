@@ -2,7 +2,7 @@ name: arp_scout
 description: "ARP & Subnet Scout (L2/L3 Discovery) desktop application built with Flutter and SQLite."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 0.5.1+1
 
 environment:
   sdk: ^3.13.0
