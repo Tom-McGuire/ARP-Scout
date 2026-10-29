@@ -31,6 +31,7 @@ class ArpDatabaseService {
         mac_clean TEXT NOT NULL,
         vendor TEXT NOT NULL,
         hostname TEXT,
+        custom_name TEXT,
         subnet TEXT NOT NULL,
         interface_name TEXT NOT NULL,
         status INTEGER NOT NULL,
@@ -53,6 +54,7 @@ class ArpDatabaseService {
       CREATE INDEX IF NOT EXISTS idx_arp_vendor ON arp_hosts(vendor);
       CREATE INDEX IF NOT EXISTS idx_arp_status ON arp_hosts(status);
       CREATE INDEX IF NOT EXISTS idx_arp_last_seen ON arp_hosts(last_seen_ms);
+      CREATE INDEX IF NOT EXISTS idx_arp_custom_name ON arp_hosts(custom_name);
     ''');
   }
 
@@ -114,10 +116,10 @@ class ArpDatabaseService {
             '''
             INSERT INTO arp_hosts (
               ip_address, ip_numeric, mac_address, mac_clean, vendor,
-              hostname, subnet, interface_name, status, discovery_method,
+              hostname, custom_name, subnet, interface_name, status, discovery_method,
               arp_type, rtt_ms, ttl, first_seen_ms, last_seen_ms,
               response_count, conflicting_macs, associated_ips, notes, raw_arp_line
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''',
             [
               incoming.ipAddress,
@@ -126,6 +128,7 @@ class ArpDatabaseService {
               allCleanHex,
               incoming.vendor,
               incoming.hostname,
+              incoming.customName,
               incoming.subnet,
               incoming.interfaceName,
               effectiveStatus.code,
@@ -195,6 +198,7 @@ class ArpDatabaseService {
               mac_clean = ?,
               vendor = ?,
               hostname = COALESCE(?, hostname),
+              custom_name = COALESCE(?, custom_name),
               subnet = ?,
               interface_name = ?,
               status = ?,
@@ -214,6 +218,7 @@ class ArpDatabaseService {
               mergedCleanHex,
               finalVendor,
               incoming.hostname,
+              incoming.customName,
               incoming.subnet.isNotEmpty ? incoming.subnet : existing.subnet,
               incoming.interfaceName.isNotEmpty
                   ? incoming.interfaceName
@@ -244,6 +249,20 @@ class ArpDatabaseService {
     }
 
     _enforceRetentionCap();
+  }
+
+  /// Updates custom device name for all rows claiming the specified MAC address.
+  void updateCustomNameByMac(String mac, String customName) {
+    final cleanHex = _cleanMacHex(mac);
+    if (cleanHex.isEmpty) return;
+    _db.execute(
+      '''
+      UPDATE arp_hosts 
+      SET custom_name = ? 
+      WHERE mac_clean LIKE ?
+      ''',
+      [customName.trim(), '%$cleanHex%'],
+    );
   }
 
   /// Cleans up temporary 'RESOLVING...' placeholders if a scan was cancelled mid-sweep.
@@ -369,6 +388,7 @@ class ArpDatabaseService {
       'mac_address': 'mac_address',
       'vendor': 'vendor',
       'hostname': 'hostname',
+      'custom_name': 'custom_name',
       'status': 'status',
       'rtt_ms': 'rtt_ms',
       'ttl': 'ttl',
@@ -447,7 +467,7 @@ class ArpDatabaseService {
     final clauses = <String>[];
     final params = <Object?>[];
 
-    // Unified search query across IP, MAC (formatted or hex-only), Vendor, Hostname, Notes, and Conflicting MACs
+    // Unified search query across IP, MAC (formatted or hex-only), Vendor, Hostname, Custom Device Name, Notes, and Conflicting MACs
     if (filter.searchQuery.trim().isNotEmpty) {
       final raw = filter.searchQuery.trim();
       final q = '%${_escapeLike(raw)}%';
@@ -455,14 +475,14 @@ class ArpDatabaseService {
       if (cleanHex.isNotEmpty && cleanHex.length >= 2) {
         final hexQuery = '%$cleanHex%';
         clauses.add(
-          "(ip_address LIKE ? ESCAPE '\\' OR mac_address LIKE ? ESCAPE '\\' OR mac_clean LIKE ? OR conflicting_macs LIKE ? ESCAPE '\\' OR vendor LIKE ? ESCAPE '\\' OR hostname LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')",
+          "(ip_address LIKE ? ESCAPE '\\' OR mac_address LIKE ? ESCAPE '\\' OR mac_clean LIKE ? OR conflicting_macs LIKE ? ESCAPE '\\' OR vendor LIKE ? ESCAPE '\\' OR hostname LIKE ? ESCAPE '\\' OR custom_name LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')",
         );
-        params.addAll([q, q, hexQuery, q, q, q, q]);
+        params.addAll([q, q, hexQuery, q, q, q, q, q]);
       } else {
         clauses.add(
-          "(ip_address LIKE ? ESCAPE '\\' OR mac_address LIKE ? ESCAPE '\\' OR conflicting_macs LIKE ? ESCAPE '\\' OR vendor LIKE ? ESCAPE '\\' OR hostname LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')",
+          "(ip_address LIKE ? ESCAPE '\\' OR mac_address LIKE ? ESCAPE '\\' OR conflicting_macs LIKE ? ESCAPE '\\' OR vendor LIKE ? ESCAPE '\\' OR hostname LIKE ? ESCAPE '\\' OR custom_name LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')",
         );
-        params.addAll([q, q, q, q, q, q]);
+        params.addAll([q, q, q, q, q, q, q]);
       }
     }
 

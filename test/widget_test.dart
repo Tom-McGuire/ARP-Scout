@@ -1,3 +1,4 @@
+import 'package:arp_scout/data/repositories/arp_repository.dart';
 import 'package:arp_scout/data/services/database/arp_database_service.dart';
 import 'package:arp_scout/data/services/export/export_service.dart';
 import 'package:arp_scout/data/services/import/csv_import_service.dart';
@@ -9,6 +10,7 @@ import 'package:arp_scout/domain/models/host_status.dart';
 import 'package:arp_scout/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:network_suite_shared/network_suite_shared.dart';
 
 void main() {
   group('OuiLookupService', () {
@@ -297,6 +299,49 @@ IP Address,MAC Address,Vendor (OUI),Hostname,Status
       expect(find.textContaining('IP ADDRESS CONFLICT DETECTED'), findsOneWidget);
       expect(find.text('192.168.10.1'), findsOneWidget);
       expect(find.text('192.168.10.50'), findsOneWidget);
+    });
+  });
+
+  group('SharedDeviceDatabase & ARP-Scout Integration', () {
+    test('auto-registers discovered hosts and updates friendly names across suite', () async {
+      await SharedDeviceDatabase.instance.init(dbPath: ':memory:');
+
+      final repo = ArpRepository();
+      const host = ArpHostRecord(
+        ipAddress: '192.168.1.55',
+        ipNumeric: 3232235831,
+        macAddress: '00:1A:2B:3C:4D:5E',
+        vendor: 'Cisco Systems, Inc.',
+        hostname: 'core-sw-01',
+        subnet: '192.168.1.0/24',
+        interfaceName: 'Ethernet',
+        status: HostStatus.online,
+        discoveryMethod: 'ARP + ICMP',
+        firstSeenMs: 1000,
+        lastSeenMs: 1000,
+      );
+
+      repo.upsertBatch([host]);
+
+      // Check registered in SharedDeviceDatabase
+      final device = SharedDeviceDatabase.instance.getDeviceByMac('00:1A:2B:3C:4D:5E');
+      expect(device, isNotNull);
+      expect(device!.name, equals('core-sw-01'));
+      expect(device.sourceApp, equals('arp-scout'));
+
+      // User updates device name
+      repo.updateDeviceName('00:1A:2B:3C:4D:5E', "Tom's Core Switch");
+
+      final updatedDevice = SharedDeviceDatabase.instance.getDeviceByMac('00:1A:2B:3C:4D:5E');
+      expect(updatedDevice!.name, equals("Tom's Core Switch"));
+
+      // Verify queried host record in repo reflects the custom name
+      final results = repo.queryHosts(
+        filter: const ArpFilterCriteria(searchQuery: "Tom's Core Switch"),
+      );
+      expect(results.length, equals(1));
+      expect(results.first.customName, equals("Tom's Core Switch"));
+      expect(results.first.displayName, equals("Tom's Core Switch"));
     });
   });
 }

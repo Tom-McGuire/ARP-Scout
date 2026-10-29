@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:network_suite_shared/network_suite_shared.dart';
 import '../../../../data/repositories/arp_repository.dart';
 import '../../../../data/services/import/csv_import_service.dart';
 import '../../../../data/services/oui/oui_lookup_service.dart';
@@ -34,6 +35,7 @@ class ArpScoutViewModel extends ChangeNotifier {
   String? _loadedFileName;
   ArpHostRecord? _selectedRecord;
   Timer? _watchTimer;
+  StreamSubscription<void>? _sharedDbSubscription;
 
   List<NetworkAdapterInfo> get adapters => _adapters;
   NetworkAdapterInfo get selectedAdapter => _selectedAdapter;
@@ -55,7 +57,28 @@ class ArpScoutViewModel extends ChangeNotifier {
       _scanProgress.isScanning || _scanProgress.isContinuousWatch;
 
   Future<void> _init() async {
+    _initSharedDbListener();
     await refreshAdapters();
+    _refreshQuery();
+  }
+
+  void _initSharedDbListener() {
+    try {
+      if (SharedDeviceDatabase.instance.isInitialized) {
+        _repository.syncAllSharedDeviceNamesToLocalDb();
+        _sharedDbSubscription = SharedDeviceDatabase.instance.onDatabaseChanged.listen((_) {
+          _repository.syncAllSharedDeviceNamesToLocalDb();
+          _refreshQuery();
+        });
+      }
+    } catch (e) {
+      debugPrint('Shared device listener init error: $e');
+    }
+  }
+
+  /// Updates a friendly device name and syncs across Network Suite applications.
+  void updateDeviceName(String macAddress, String newName) {
+    _repository.updateDeviceName(macAddress, newName);
     _refreshQuery();
   }
 
@@ -467,6 +490,7 @@ class ArpScoutViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _watchTimer?.cancel();
+    _sharedDbSubscription?.cancel();
     _repository.dispose();
     super.dispose();
   }

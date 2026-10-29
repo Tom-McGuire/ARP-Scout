@@ -96,7 +96,26 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                     color: Color(0xFF38BDF8),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
+                if (record.customName != null && record.customName!.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                    ),
+                    child: Text(
+                      record.customName!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF38BDF8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 Text(
                   '(${record.vendor})',
                   style: const TextStyle(fontSize: 12, color: Colors.white70),
@@ -138,7 +157,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                   padding: EdgeInsets.zero,
                   onPressed: () {
                     final summary =
-                        'IP: ${record.ipAddress} | MAC: ${record.macAddress} | Vendor: ${record.vendor} | Status: ${record.status.label} | Hostname: ${record.hostname ?? "-"} | Conflicts: ${record.conflictingMacs.join(", ")}';
+                        'Device: ${record.displayName} | IP: ${record.ipAddress} | MAC: ${record.macAddress} | Vendor: ${record.vendor} | Status: ${record.status.label} | Hostname: ${record.hostname ?? "-"} | Conflicts: ${record.conflictingMacs.join(", ")}';
                     Clipboard.setData(ClipboardData(text: summary));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -148,6 +167,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                     );
                   },
                 ),
+
                 // Close Inspector Button
                 IconButton(
                   tooltip: 'Close Detail Inspector',
@@ -283,6 +303,13 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
             spacing: 24,
             runSpacing: 10,
             children: [
+              _buildEditableMetaItem(
+                context,
+                vm,
+                record,
+                'Device Name (Shared Suite)',
+                record.displayName,
+              ),
               _buildMetaItem('IPv4 Address', record.ipAddress, monospace: true),
               _buildMetaItem(
                 'Physical MAC (L2)',
@@ -387,9 +414,9 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                   formattedHexDump,
                   style: const TextStyle(
                     fontFamily: 'monospace',
-                    fontSize: 12,
-                    height: 1.45,
-                    color: Color(0xFFD4D4D4),
+                    fontSize: 11,
+                    height: 1.35,
+                    color: Color(0xFFE2E8F0),
                   ),
                 ),
               ),
@@ -400,101 +427,88 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
     );
   }
 
-  /// Canonical CLI & Command Preview Card from Section 5.5 (`#0F141C` background, `#30363D` border)
   Widget _buildCliAndRawTab(
     BuildContext context,
     ArpScoutViewModel vm,
     ArpHostRecord record,
   ) {
-    final cliCmd = vm.scanProgress.generatedCommand;
+    final targetSubnet = record.subnet.isNotEmpty
+        ? record.subnet
+        : '${record.ipAddress}/32';
+    final cliCommand = vm.scanProgress.generatedCommand.isNotEmpty
+        ? vm.scanProgress.generatedCommand
+        : 'arp-scout sweep $targetSubnet --interface "${record.interfaceName}" --json';
+
     final rawArp = record.rawArpLine.isNotEmpty
         ? record.rawArpLine
-        : '${record.ipAddress.padRight(22)} ${record.macAddress.padRight(20)} ${record.arpType}';
+        : '${record.ipAddress}    ${record.macAddress}    ${record.arpType}';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Canonical CLI Preview Card (#0F141C with #30363D border and 12px radius)
+          Row(
+            children: [
+              const Text(
+                'EQUIVALENT CLI SCAN COMMAND',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Copy CLI Command',
+                icon: const Icon(Icons.copy, size: 14),
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                padding: EdgeInsets.zero,
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: cliCommand));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('CLI Command copied to clipboard'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF0F141C),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF30363D)),
+              color: const Color(0xFF141414),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF2C2C2C)),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.terminal,
-                      size: 14,
-                      color: Color(0xFF38BDF8),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Generated Command',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    const Spacer(),
-                    InkWell(
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(text: cliCmd));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('CLI command copied to clipboard'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                      },
-                      child: const Row(
-                        children: [
-                          Icon(Icons.copy, size: 12, color: Color(0xFF38BDF8)),
-                          SizedBox(width: 4),
-                          Text(
-                            'Copy',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF38BDF8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                SelectableText(
-                  cliCmd,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    color: Color(0xFFD4D4D4),
-                  ),
-                ),
-              ],
+            child: SelectableText(
+              cliCommand,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                color: Color(0xFF38BDF8),
+              ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           const Text(
-            'RAW KERNEL ARP CACHE ENTRY',
+            'RAW OS ARP ENTRY',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
               color: Colors.grey,
+              letterSpacing: 0.5,
             ),
           ),
           const SizedBox(height: 4),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: const Color(0xFF141414),
               borderRadius: BorderRadius.circular(6),
@@ -540,6 +554,61 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
     return buffer.toString().trimRight();
   }
 
+  Widget _buildEditableMetaItem(
+    BuildContext context,
+    ArpScoutViewModel vm,
+    ArpHostRecord record,
+    String label,
+    String value,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 2),
+        InkWell(
+          onTap: () => _showEditDeviceNameDialog(context, vm, record),
+          borderRadius: BorderRadius.circular(4),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: const Color(0xFF3E3E42)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: record.customName != null ? FontWeight.bold : FontWeight.w500,
+                    color: record.customName != null ? const Color(0xFF38BDF8) : Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.edit_outlined,
+                  size: 13,
+                  color: Color(0xFF38BDF8),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMetaItem(String label, String value, {bool monospace = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,6 +632,109 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _showEditDeviceNameDialog(
+    BuildContext context,
+    ArpScoutViewModel vm,
+    ArpHostRecord record,
+  ) async {
+    final initialName = record.customName ?? (record.hostname ?? '');
+    final controller = TextEditingController(text: initialName);
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Row(
+            children: [
+              Icon(Icons.devices, size: 20, color: Color(0xFF38BDF8)),
+              SizedBox(width: 8),
+              Text('Edit Device Name', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+          content: SizedBox(
+            width: 420,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Updates hardware identity across all Network Suite tools for MAC:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141414),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF3E3E42)),
+                    ),
+                    child: Text(
+                      '${record.macAddress} • ${record.vendor}',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: Color(0xFF38BDF8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: controller,
+                    autofocus: true,
+                    style: const TextStyle(fontSize: 13, color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Friendly Device Name',
+                      hintText: 'e.g. Living Room Apple TV, Core Switch',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.label_outline, size: 18),
+                    ),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'Device name cannot be empty';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.check, size: 16),
+              label: const Text('Save Device Name'),
+              onPressed: () {
+                if (formKey.currentState?.validate() ?? false) {
+                  final newName = controller.text.trim();
+                  vm.updateDeviceName(record.macAddress, newName);
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Updated name for ${record.macAddress} to "$newName" in Network Suite',
+                      ),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

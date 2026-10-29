@@ -10,6 +10,7 @@ class ArpHostRecord {
     required this.macAddress,
     required this.vendor,
     this.hostname,
+    this.customName,
     required this.subnet,
     required this.interfaceName,
     required this.status,
@@ -32,6 +33,7 @@ class ArpHostRecord {
   final String macAddress;
   final String vendor;
   final String? hostname;
+  final String? customName;
   final String subnet;
   final String interfaceName;
   final HostStatus status;
@@ -52,6 +54,17 @@ class ArpHostRecord {
 
   bool get hasConflict =>
       status == HostStatus.conflict || conflictingMacs.length > 1;
+
+  /// Returns user-defined custom name if available, otherwise hostname if available, or '-'
+  String get displayName {
+    if (customName != null && customName!.trim().isNotEmpty) {
+      return customName!.trim();
+    }
+    if (hostname != null && hostname!.trim().isNotEmpty) {
+      return hostname!.trim();
+    }
+    return '-';
+  }
 
   /// Infers likely operating system / device family from ICMP TTL value.
   String get osHintFromTtl {
@@ -174,6 +187,7 @@ class ArpHostRecord {
     String? macAddress,
     String? vendor,
     String? hostname,
+    String? customName,
     String? subnet,
     String? interfaceName,
     HostStatus? status,
@@ -196,6 +210,7 @@ class ArpHostRecord {
       macAddress: macAddress ?? this.macAddress,
       vendor: vendor ?? this.vendor,
       hostname: hostname ?? this.hostname,
+      customName: customName ?? this.customName,
       subnet: subnet ?? this.subnet,
       interfaceName: interfaceName ?? this.interfaceName,
       status: status ?? this.status,
@@ -234,6 +249,7 @@ class ArpHostRecord {
       macAddress: row['mac_address'] as String? ?? 'UNRESOLVED',
       vendor: row['vendor'] as String? ?? 'Unknown Vendor',
       hostname: row['hostname'] as String?,
+      customName: row['custom_name'] as String?,
       subnet: row['subnet'] as String? ?? '',
       interfaceName: row['interface_name'] as String? ?? '',
       status: HostStatus.fromCode(row['status'] as int? ?? 1),
@@ -258,6 +274,7 @@ class ArpHostRecord {
       'macAddress': macAddress,
       'vendor': vendor,
       'hostname': hostname,
+      'customName': customName,
       'subnet': subnet,
       'interfaceName': interfaceName,
       'status': status.label,

@@ -12,7 +12,7 @@ enum ArpTableColumn {
   ip('IP Address', 'ip_numeric', 135.0, 100.0),
   mac('MAC Address', 'mac_address', 155.0, 120.0),
   vendor('Vendor (OUI)', 'vendor', 220.0, 120.0),
-  hostname('Hostname', 'hostname', 175.0, 95.0),
+  hostname('Device Name / Host', 'custom_name', 195.0, 110.0),
   rtt('RTT', 'rtt_ms', 80.0, 60.0),
   ttl('TTL / OS Hint', 'ttl', 140.0, 85.0),
   discovery('Discovery', 'discovery_method', 120.0, 85.0),
@@ -162,70 +162,59 @@ class _ArpTableViewState extends State<ArpTableView> {
   }
 
   Widget _buildEmptyState(BuildContext context, ArpScoutViewModel vm) {
-    final hasActiveFilter = vm.filter.hasActiveFilter;
     final isScanning = vm.scanProgress.isScanning;
+    final hasActiveFilter =
+        vm.filter.searchQuery.isNotEmpty ||
+        vm.filter.ipFilter.isNotEmpty ||
+        vm.filter.macFilter.isNotEmpty ||
+        vm.filter.vendorFilter.isNotEmpty ||
+        vm.filter.conflictsOnly ||
+        vm.filter.selectedStatuses.isNotEmpty;
 
-    return Container(
-      color: Theme.of(context).colorScheme.surface,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+    return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(
-                context,
-              ).colorScheme.primaryContainer.withValues(alpha: 0.3),
-            ),
-            child: Icon(
-              hasActiveFilter
-                  ? Icons.filter_alt_off_outlined
-                  : (isScanning ? Icons.radar : Icons.hub_outlined),
-              size: 56,
-              color: Theme.of(context).colorScheme.primary.withValues(
-                alpha: 0.85,
-              ),
-            ),
+          Icon(
+            isScanning ? Icons.radar : Icons.lan_outlined,
+            size: 54,
+            color: isScanning
+                ? Theme.of(context).colorScheme.primary
+                : Colors.grey.withValues(alpha: 0.5),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Text(
-            hasActiveFilter
-                ? 'No Hosts Match Active Filter'
-                : (isScanning
-                      ? 'Sweeping Subnet ${vm.scanProgress.targetSubnet}...'
+            isScanning
+                ? 'Sweeping Subnet ${vm.scanProgress.targetSubnet}...'
+                : (hasActiveFilter
+                      ? 'No hosts match your active search filters'
                       : 'No ARP or Subnet Discovery Data Loaded'),
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Text(
-              hasActiveFilter
-                  ? 'Try clearing your IP, MAC, or Vendor search filters above to view all discovered hosts.'
-                  : 'Run an active L2/L3 Subnet Sweep, read the local OS ARP table, or load the built-in Enterprise Subnet Demo (with IP conflicts & OUI lookups).',
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
+          Text(
+            isScanning
+                ? 'Emitting concurrent ICMP echo sweeps & reading OS ARP tables...'
+                : (hasActiveFilter
+                      ? 'Try clearing your search query or status filter chips'
+                      : 'Select a network interface above and click "Sweep Subnet", or read your local ARP cache.'),
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           if (hasActiveFilter)
             FilledButton.tonalIcon(
-              icon: const Icon(Icons.clear_all, size: 16),
-              label: const Text('Clear All Filters'),
+              icon: const Icon(Icons.filter_alt_off, size: 16),
+              label: const Text('Reset All Filters'),
               onPressed: () => vm.resetFilters(),
             )
           else
             Wrap(
               spacing: 12,
               runSpacing: 8,
-              alignment: WrapAlignment.center,
               children: [
                 FilledButton.icon(
-                  icon: const Icon(Icons.radar, size: 16),
-                  label: Text('Sweep ${vm.scanProgress.targetSubnet}'),
+                  icon: const Icon(Icons.play_arrow, size: 16),
+                  label: const Text('Sweep Subnet'),
                   onPressed: isScanning ? null : () => vm.startSubnetScan(),
                 ),
                 FilledButton.tonalIcon(
@@ -449,16 +438,39 @@ class _ArpTableViewState extends State<ArpTableView> {
               ),
             ),
 
-            // 5. Hostname
+            // 5. Device Name / Hostname (Prominent Shared Suite Device Name)
             SizedBox(
               width: widths[ArpTableColumn.hostname],
-              child: Text(
-                record.hostname ?? '-',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: record.hostname != null ? Colors.white : Colors.grey,
+              child: InkWell(
+                onTap: () => _showEditDeviceNameDialog(context, vm, record),
+                borderRadius: BorderRadius.circular(4),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        record.displayName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: record.customName != null
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          color: record.customName != null
+                              ? const Color(0xFF38BDF8)
+                              : (record.hostname != null
+                                  ? Colors.white
+                                  : Colors.grey),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.edit_outlined,
+                      size: 11,
+                      color: Colors.grey.withValues(alpha: 0.5),
+                    ),
+                  ],
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
 
@@ -701,6 +713,17 @@ class _ArpTableViewState extends State<ArpTableView> {
       ),
       items: [
         PopupMenuItem(
+          value: 'edit_name',
+          child: Row(
+            children: [
+              const Icon(Icons.edit_note, size: 16, color: Color(0xFF38BDF8)),
+              const SizedBox(width: 8),
+              Text('Edit Device Name (${record.displayName})...'),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
           value: 'copy_ip',
           child: Row(
             children: [
@@ -790,6 +813,9 @@ class _ArpTableViewState extends State<ArpTableView> {
     ).then((value) {
       if (!context.mounted || value == null) return;
       switch (value) {
+        case 'edit_name':
+          _showEditDeviceNameDialog(context, vm, record);
+          break;
         case 'copy_ip':
           Clipboard.setData(ClipboardData(text: record.ipAddress));
           break;
@@ -816,5 +842,108 @@ class _ArpTableViewState extends State<ArpTableView> {
           break;
       }
     });
+  }
+
+  Future<void> _showEditDeviceNameDialog(
+    BuildContext context,
+    ArpScoutViewModel vm,
+    ArpHostRecord record,
+  ) async {
+    final initialName = record.customName ?? (record.hostname ?? '');
+    final controller = TextEditingController(text: initialName);
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Row(
+            children: [
+              Icon(Icons.devices, size: 20, color: Color(0xFF38BDF8)),
+              SizedBox(width: 8),
+              Text('Edit Device Name', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+          content: SizedBox(
+            width: 420,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Updates hardware identity across all Network Suite tools for MAC:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141414),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF3E3E42)),
+                    ),
+                    child: Text(
+                      '${record.macAddress} • ${record.vendor}',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: Color(0xFF38BDF8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: controller,
+                    autofocus: true,
+                    style: const TextStyle(fontSize: 13, color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Friendly Device Name',
+                      hintText: 'e.g. Living Room Apple TV, Core Switch',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.label_outline, size: 18),
+                    ),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'Device name cannot be empty';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.check, size: 16),
+              label: const Text('Save Device Name'),
+              onPressed: () {
+                if (formKey.currentState?.validate() ?? false) {
+                  final newName = controller.text.trim();
+                  vm.updateDeviceName(record.macAddress, newName);
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Updated name for ${record.macAddress} to "$newName" in Network Suite',
+                      ),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 }

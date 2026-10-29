@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:network_suite_shared/network_suite_shared.dart';
 import '../../domain/models/arp_filter.dart';
 import '../../domain/models/arp_host_record.dart';
 import '../../domain/models/host_status.dart';
@@ -26,8 +28,106 @@ class ArpRepository {
     return NetworkAdapterService.getAvailableAdapters();
   }
 
+  /// Syncs newly discovered records with the Network Suite cross-process device database.
+  /// Decorates existing records with their persistent custom name or registers newly discovered MACs.
+  List<ArpHostRecord> syncWithSharedDevices(List<ArpHostRecord> records) {
+    if (records.isEmpty) return records;
+    final results = List<ArpHostRecord>.from(records);
+
+    for (var i = 0; i < results.length; i++) {
+      final record = results[i];
+      final rawMac = record.macAddress;
+      if (!SharedDevice.isValidMac(rawMac)) continue;
+
+      final normalizedMac = SharedDevice.normalizeMac(rawMac);
+      try {
+        if (SharedDeviceDatabase.instance.isInitialized) {
+          final existing = SharedDeviceDatabase.instance.getDeviceByMac(normalizedMac);
+          if (existing != null) {
+            results[i] = record.copyWith(customName: existing.name);
+          } else {
+            // Register newly discovered device into SharedDeviceDatabase
+            final vendor = record.vendor.isNotEmpty && record.vendor != 'Unknown Vendor'
+                ? record.vendor
+                : OuiLookup.lookupVendor(normalizedMac);
+            final hostname = record.hostname ?? '';
+            final category = OuiLookup.inferCategory(vendor, hostname);
+            final device = SharedDevice(
+              macAddress: normalizedMac,
+              name: hostname.isNotEmpty ? hostname : 'Device $normalizedMac',
+              vendor: vendor,
+              deviceType: category.key,
+              notes: 'Discovered by arp-scout (${record.ipAddress})',
+              sourceApp: 'arp-scout',
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+            SharedDeviceDatabase.instance.upsertDevice(device);
+            results[i] = record.copyWith(customName: device.name);
+          }
+        }
+      } catch (e) {
+        debugPrint('Shared device sync error: $e');
+      }
+    }
+
+    return results;
+  }
+
+  /// Updates friendly device name both in the cross-process SharedDeviceDatabase
+  /// and within the local in-memory SQLite state.
+  void updateDeviceName(String macAddress, String newName) {
+    if (!SharedDevice.isValidMac(macAddress)) return;
+    final normalizedMac = SharedDevice.normalizeMac(macAddress);
+    final trimmedName = newName.trim();
+    if (trimmedName.isEmpty) return;
+
+    try {
+      if (SharedDeviceDatabase.instance.isInitialized) {
+        final existing = SharedDeviceDatabase.instance.getDeviceByMac(normalizedMac);
+        if (existing != null) {
+          SharedDeviceDatabase.instance.updateDeviceName(normalizedMac, trimmedName);
+        } else {
+          final vendor = OuiLookup.lookupVendor(normalizedMac);
+          final category = OuiLookup.inferCategory(vendor, trimmedName);
+          SharedDeviceDatabase.instance.upsertDevice(
+            SharedDevice(
+              macAddress: normalizedMac,
+              name: trimmedName,
+              vendor: vendor,
+              deviceType: category.key,
+              notes: 'Registered by arp-scout',
+              sourceApp: 'arp-scout',
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error updating device name in shared database: $e');
+    }
+
+    _dbService.updateCustomNameByMac(normalizedMac, trimmedName);
+  }
+
+  /// Synchronizes all known device names from SharedDeviceDatabase into the local SQLite table.
+  void syncAllSharedDeviceNamesToLocalDb() {
+    try {
+      if (SharedDeviceDatabase.instance.isInitialized) {
+        final devices = SharedDeviceDatabase.instance.getAllDevices();
+        for (final dev in devices) {
+          _dbService.updateCustomNameByMac(dev.macAddress, dev.name);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error syncing shared device names: $e');
+    }
+  }
+
   void upsertBatch(List<ArpHostRecord> records) {
-    _dbService.upsertBatch(records);
+    final synced = syncWithSharedDevices(records);
+    _dbService.upsertBatch(synced);
   }
 
   void cleanupCancelledSweep() {
@@ -78,7 +178,7 @@ class ArpRepository {
     final demoRecords = DemoArpGenerator.generateEnterpriseSubnet(
       subnetCidr: subnetCidr,
     );
-    _dbService.upsertBatch(demoRecords);
+    upsertBatch(demoRecords);
   }
 
   Future<List<ArpHostRecord>> performSubnetSweep({
@@ -108,7 +208,7 @@ class ArpRepository {
     if (replaceExisting) {
       _dbService.clearAll();
     }
-    _dbService.upsertBatch(result.records);
+    upsertBatch(result.records);
     return result;
   }
 

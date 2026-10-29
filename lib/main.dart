@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:network_suite_shared/network_suite_shared.dart';
 import 'package:provider/provider.dart';
 import 'ui/features/scout/view_models/arp_scout_view_model.dart';
 import 'ui/features/scout/views/arp_scout_screen.dart';
 import 'ui/theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await SharedDeviceDatabase.instance.init();
+  } catch (e) {
+    debugPrint('Shared database offline: $e');
+  }
   runApp(const ArpScoutApp());
 }
 
