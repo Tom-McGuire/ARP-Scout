@@ -49,7 +49,7 @@ jobs:
       - name: Check out network_suite_shared dependency
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository_owner }}/network_suite_shared
+          repository: ${{ github.repository_owner }}/network-suite-shared
           path: network_suite_shared
 
       # Step 2: Install Linux build dependencies (includes sqlite3 for database tools)
