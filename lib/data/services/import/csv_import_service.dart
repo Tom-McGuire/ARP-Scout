@@ -95,13 +95,45 @@ class CsvImportService {
     final vendorIdx = _findCol(header, ['vendor', 'oui', 'manufacturer'], 2);
     final hostIdx = _findCol(
       header,
-      ['hostname', 'host name', 'name', 'dns'],
-      3,
+      ['hostname', 'host name', 'dns hostname', 'dns_hostname', 'dns'],
+      hasHeader ? -1 : 3,
     );
-    final statusIdx = _findCol(header, ['status', 'state'], 4);
-    final rttIdx = _findCol(header, ['rtt', 'latency', 'ping'], 7);
-    final ttlIdx = _findCol(header, ['ttl'], 8);
-    final notesIdx = _findCol(header, ['notes', 'description', 'comment'], 15);
+    var customNameIdx = _findCol(
+      header,
+      [
+        'custom name',
+        'custom_name',
+        'device name / host',
+        'device name',
+        'device_name',
+        'friendly name',
+        'friendly_name',
+        'custom hostname',
+        'custom_hostname',
+        'custom host',
+        'custom',
+      ],
+      hasHeader ? -1 : 4,
+    );
+
+    if (hasHeader) {
+      if (customNameIdx == -1 && hostIdx == -1) {
+        final nameIdx = _findCol(header, ['name', 'device'], -1);
+        if (nameIdx != -1) {
+          customNameIdx = nameIdx;
+        }
+      } else if (customNameIdx == -1 && hostIdx != -1) {
+        final nameIdx = _findCol(header, ['name', 'device'], -1);
+        if (nameIdx != -1 && nameIdx != hostIdx) {
+          customNameIdx = nameIdx;
+        }
+      }
+    }
+
+    final statusIdx = _findCol(header, ['status', 'state'], hasHeader ? -1 : 5);
+    final rttIdx = _findCol(header, ['rtt', 'latency', 'ping'], hasHeader ? -1 : 8);
+    final ttlIdx = _findCol(header, ['ttl'], hasHeader ? -1 : 9);
+    final notesIdx = _findCol(header, ['notes', 'description', 'comment'], hasHeader ? -1 : 16);
 
     final startRow = hasHeader ? 1 : 0;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -131,11 +163,14 @@ class CsvImportService {
       final vendor = rawVendor.isNotEmpty
           ? rawVendor
           : OuiLookupService.lookupVendor(normalizedMac);
-      final hostname = _stripLeadingFormulaQuote(_cell(row, hostIdx));
-      final statusStr = _cell(row, statusIdx).toUpperCase();
-      final rtt = double.tryParse(_cell(row, rttIdx));
-      final ttl = int.tryParse(_cell(row, ttlIdx));
-      final notes = _stripLeadingFormulaQuote(_cell(row, notesIdx));
+      final rawHost = hostIdx != -1 ? _stripLeadingFormulaQuote(_cell(row, hostIdx)) : '';
+      final hostname = rawHost.isNotEmpty ? rawHost : null;
+      final rawCustom = customNameIdx != -1 ? _stripLeadingFormulaQuote(_cell(row, customNameIdx)) : '';
+      final customName = rawCustom.isNotEmpty ? rawCustom : null;
+      final statusStr = statusIdx != -1 ? _cell(row, statusIdx).toUpperCase() : '';
+      final rtt = rttIdx != -1 ? double.tryParse(_cell(row, rttIdx)) : null;
+      final ttl = ttlIdx != -1 ? int.tryParse(_cell(row, ttlIdx)) : null;
+      final notes = notesIdx != -1 ? _stripLeadingFormulaQuote(_cell(row, notesIdx)) : '';
 
       var status = HostStatus.online;
       if (statusStr.contains('CONFLICT')) {
@@ -157,7 +192,8 @@ class CsvImportService {
           ipNumeric: ArpHostRecord.ipv4ToInt(ip),
           macAddress: normalizedMac,
           vendor: vendor,
-          hostname: hostname.isEmpty ? null : hostname,
+          hostname: hostname,
+          customName: customName,
           subnet: subnet,
           interfaceName: 'CSV Import',
           status: status,

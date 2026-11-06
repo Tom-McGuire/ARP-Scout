@@ -28,13 +28,14 @@ class ExportService {
     return value;
   }
 
-  static Future<String?> exportToCsv(List<ArpHostRecord> records) async {
+  static String buildCsv(List<ArpHostRecord> records) {
     final rows = <List<dynamic>>[
       [
         'IP Address',
         'MAC Address',
         'Vendor (OUI)',
         'Hostname',
+        'Custom Name',
         'Status',
         'Discovery Method',
         'ARP Type',
@@ -54,6 +55,7 @@ class ExportService {
           sanitizeForCsv(r.macAddress),
           sanitizeForCsv(r.vendor),
           sanitizeForCsv(r.hostname),
+          sanitizeForCsv(r.customName),
           sanitizeForCsv(r.status.label),
           sanitizeForCsv(r.discoveryMethod),
           sanitizeForCsv(r.arpType),
@@ -70,7 +72,11 @@ class ExportService {
       ),
     ];
 
-    final csvContent = Csv().encode(rows);
+    return Csv().encode(rows);
+  }
+
+  static Future<String?> exportToCsv(List<ArpHostRecord> records) async {
+    final csvContent = buildCsv(records);
     final bytes = Uint8List.fromList(utf8.encode(csvContent));
     final uri = await FilePicker.saveFile(
       dialogTitle: 'Export ARP & Subnet Table as CSV',

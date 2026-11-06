@@ -142,6 +142,64 @@ IP Address,MAC Address,Vendor (OUI),Hostname,Status
       expect(res.records[1].vendor, equals('Ubiquiti Inc.'));
       expect(res.records[1].status, equals(HostStatus.arpOnly));
     });
+
+    test('exports and imports manually entered custom host names via CSV', () {
+      final records = [
+        const ArpHostRecord(
+          ipAddress: '192.168.1.10',
+          ipNumeric: 3232235786,
+          macAddress: '00:11:22:33:44:55',
+          vendor: 'Apple, Inc.',
+          hostname: 'macbook.local',
+          customName: "Tom's MacBook Pro",
+          subnet: '192.168.1.0/24',
+          interfaceName: 'wlan0',
+          status: HostStatus.online,
+          discoveryMethod: 'ARP + ICMP',
+          firstSeenMs: 1000,
+          lastSeenMs: 2000,
+        ),
+        const ArpHostRecord(
+          ipAddress: '192.168.1.20',
+          ipNumeric: 3232235796,
+          macAddress: 'AA:BB:CC:DD:EE:FF',
+          vendor: 'Raspberry Pi Foundation',
+          hostname: null,
+          customName: 'Pi-Hole DNS Server',
+          subnet: '192.168.1.0/24',
+          interfaceName: 'eth0',
+          status: HostStatus.online,
+          discoveryMethod: 'ARP + ICMP',
+          firstSeenMs: 1000,
+          lastSeenMs: 2000,
+        ),
+      ];
+
+      final csvContent = ExportService.buildCsv(records);
+      expect(csvContent, contains('Custom Name'));
+      expect(csvContent, contains("Tom's MacBook Pro"));
+      expect(csvContent, contains('Pi-Hole DNS Server'));
+
+      final imported = CsvImportService.parseCsvContent(csvContent, fileName: 'export.csv');
+      expect(imported.records.length, equals(2));
+      expect(imported.records[0].hostname, equals('macbook.local'));
+      expect(imported.records[0].customName, equals("Tom's MacBook Pro"));
+      expect(imported.records[0].displayName, equals("Tom's MacBook Pro"));
+      expect(imported.records[1].hostname, isNull);
+      expect(imported.records[1].customName, equals('Pi-Hole DNS Server'));
+      expect(imported.records[1].displayName, equals('Pi-Hole DNS Server'));
+    });
+
+    test('parses CSV containing Device Name column header', () {
+      const csvText = '''
+IP Address,MAC Address,Vendor,Hostname,Device Name,Status
+10.0.0.1,00:1A:2B:3C:4D:5E,Cisco,gw.internal,Main Core Gateway,ONLINE
+''';
+      final res = CsvImportService.parseCsvContent(csvText);
+      expect(res.records.length, equals(1));
+      expect(res.records.first.hostname, equals('gw.internal'));
+      expect(res.records.first.customName, equals('Main Core Gateway'));
+    });
   });
 
   group('ArpDatabaseService (SQLite Backend)', () {
@@ -342,6 +400,78 @@ IP Address,MAC Address,Vendor (OUI),Hostname,Status
       expect(results.length, equals(1));
       expect(results.first.customName, equals("Tom's Core Switch"));
       expect(results.first.displayName, equals("Tom's Core Switch"));
+    });
+
+    test('importing records updates SharedDeviceDatabase with manual host names', () async {
+      await SharedDeviceDatabase.instance.init(dbPath: ':memory:');
+
+      final repo = ArpRepository();
+
+      // Case 1: Pre-existing device in SharedDeviceDatabase with an old name
+      SharedDeviceDatabase.instance.upsertDevice(
+        SharedDevice(
+          macAddress: '11:22:33:44:55:66',
+          name: 'Old Printer Name',
+          vendor: 'HP',
+          sourceApp: 'other-app',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+
+      // Records to import (one existing device with updated custom name, one new device with custom name)
+      final importedRecords = [
+        const ArpHostRecord(
+          ipAddress: '192.168.1.100',
+          ipNumeric: 3232235876,
+          macAddress: '11:22:33:44:55:66',
+          vendor: 'HP Inc.',
+          hostname: 'hp-printer.lan',
+          customName: 'Office LaserJet Pro',
+          subnet: '192.168.1.0/24',
+          interfaceName: 'CSV Import',
+          status: HostStatus.online,
+          discoveryMethod: 'CSV Import',
+          firstSeenMs: 1000,
+          lastSeenMs: 1000,
+        ),
+        const ArpHostRecord(
+          ipAddress: '192.168.1.101',
+          ipNumeric: 3232235877,
+          macAddress: '22:33:44:55:66:77',
+          vendor: 'Dell Inc.',
+          hostname: null,
+          customName: 'Engineering Build Server',
+          subnet: '192.168.1.0/24',
+          interfaceName: 'CSV Import',
+          status: HostStatus.online,
+          discoveryMethod: 'CSV Import',
+          firstSeenMs: 1000,
+          lastSeenMs: 1000,
+        ),
+      ];
+
+      // Simulate import batch
+      repo.upsertBatch(importedRecords, isImport: true);
+
+      // Check SharedDeviceDatabase was updated for pre-existing device
+      final dev1 = SharedDeviceDatabase.instance.getDeviceByMac('11:22:33:44:55:66');
+      expect(dev1, isNotNull);
+      expect(dev1!.name, equals('Office LaserJet Pro'));
+
+      // Check SharedDeviceDatabase was populated for new device
+      final dev2 = SharedDeviceDatabase.instance.getDeviceByMac('22:33:44:55:66:77');
+      expect(dev2, isNotNull);
+      expect(dev2!.name, equals('Engineering Build Server'));
+
+      // Check local SQLite database rows
+      final hosts = repo.queryHosts(filter: const ArpFilterCriteria());
+      final host1 = hosts.firstWhere((h) => h.ipAddress == '192.168.1.100');
+      final host2 = hosts.firstWhere((h) => h.ipAddress == '192.168.1.101');
+      expect(host1.customName, equals('Office LaserJet Pro'));
+      expect(host1.displayName, equals('Office LaserJet Pro'));
+      expect(host2.customName, equals('Engineering Build Server'));
+      expect(host2.displayName, equals('Engineering Build Server'));
     });
   });
 }

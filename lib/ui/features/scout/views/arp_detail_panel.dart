@@ -116,10 +116,12 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                   ),
                   const SizedBox(width: 8),
                 ],
-                Text(
-                  '(${record.vendor})',
-                  style: const TextStyle(fontSize: 12, color: Colors.white70),
-                  overflow: TextOverflow.ellipsis,
+                Flexible(
+                  child: Text(
+                    '(${record.vendor})',
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 const Spacer(),
 

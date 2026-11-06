@@ -28,9 +28,13 @@ class ArpRepository {
     return NetworkAdapterService.getAvailableAdapters();
   }
 
-  /// Syncs newly discovered records with the Network Suite cross-process device database.
+  /// Syncs newly discovered or imported records with the Network Suite cross-process device database.
   /// Decorates existing records with their persistent custom name or registers newly discovered MACs.
-  List<ArpHostRecord> syncWithSharedDevices(List<ArpHostRecord> records) {
+  /// When [isImport] is true, records with custom names will update the SharedDeviceDatabase.
+  List<ArpHostRecord> syncWithSharedDevices(
+    List<ArpHostRecord> records, {
+    bool isImport = false,
+  }) {
     if (records.isEmpty) return records;
     final results = List<ArpHostRecord>.from(records);
 
@@ -43,21 +47,63 @@ class ArpRepository {
       try {
         if (SharedDeviceDatabase.instance.isInitialized) {
           final existing = SharedDeviceDatabase.instance.getDeviceByMac(normalizedMac);
-          if (existing != null) {
-            results[i] = record.copyWith(customName: existing.name);
+          final hasExplicitCustomName = record.customName != null && record.customName!.trim().isNotEmpty;
+          final trimmedCustomName = hasExplicitCustomName ? record.customName!.trim() : null;
+
+          if (isImport && trimmedCustomName != null) {
+            // During import, an explicitly specified custom name MUST update the shared devices database.
+            if (existing != null) {
+              SharedDeviceDatabase.instance.updateDeviceName(normalizedMac, trimmedCustomName);
+            } else {
+              final vendor = record.vendor.isNotEmpty && record.vendor != 'Unknown Vendor'
+                  ? record.vendor
+                  : OuiLookup.lookupVendor(normalizedMac);
+              final category = OuiLookup.inferCategory(vendor, trimmedCustomName);
+              SharedDeviceDatabase.instance.upsertDevice(
+                SharedDevice(
+                  macAddress: normalizedMac,
+                  name: trimmedCustomName,
+                  vendor: vendor,
+                  deviceType: category.key,
+                  notes: 'Imported by arp-scout (${record.ipAddress})',
+                  sourceApp: 'arp-scout',
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
+                ),
+              );
+            }
+            results[i] = record.copyWith(customName: trimmedCustomName);
+          } else if (existing != null) {
+            // If importing and existing device only had a placeholder 'Device AA:BB:...' name,
+            // update it if the imported record has a real hostname.
+            if (isImport &&
+                existing.name == 'Device $normalizedMac' &&
+                record.hostname != null &&
+                record.hostname!.trim().isNotEmpty) {
+              final hostName = record.hostname!.trim();
+              SharedDeviceDatabase.instance.updateDeviceName(normalizedMac, hostName);
+              results[i] = record.copyWith(customName: hostName);
+            } else {
+              results[i] = record.copyWith(customName: existing.name);
+            }
           } else {
-            // Register newly discovered device into SharedDeviceDatabase
+            // Register newly discovered or imported device into SharedDeviceDatabase
             final vendor = record.vendor.isNotEmpty && record.vendor != 'Unknown Vendor'
                 ? record.vendor
                 : OuiLookup.lookupVendor(normalizedMac);
-            final hostname = record.hostname ?? '';
-            final category = OuiLookup.inferCategory(vendor, hostname);
+            final nameCandidate = trimmedCustomName ??
+                (record.hostname != null && record.hostname!.trim().isNotEmpty
+                    ? record.hostname!.trim()
+                    : 'Device $normalizedMac');
+            final category = OuiLookup.inferCategory(vendor, nameCandidate);
             final device = SharedDevice(
               macAddress: normalizedMac,
-              name: hostname.isNotEmpty ? hostname : 'Device $normalizedMac',
+              name: nameCandidate,
               vendor: vendor,
               deviceType: category.key,
-              notes: 'Discovered by arp-scout (${record.ipAddress})',
+              notes: isImport
+                  ? 'Imported by arp-scout (${record.ipAddress})'
+                  : 'Discovered by arp-scout (${record.ipAddress})',
               sourceApp: 'arp-scout',
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
@@ -125,8 +171,8 @@ class ArpRepository {
     }
   }
 
-  void upsertBatch(List<ArpHostRecord> records) {
-    final synced = syncWithSharedDevices(records);
+  void upsertBatch(List<ArpHostRecord> records, {bool isImport = false}) {
+    final synced = syncWithSharedDevices(records, isImport: isImport);
     _dbService.upsertBatch(synced);
   }
 
@@ -208,7 +254,7 @@ class ArpRepository {
     if (replaceExisting) {
       _dbService.clearAll();
     }
-    upsertBatch(result.records);
+    upsertBatch(result.records, isImport: true);
     return result;
   }
 
