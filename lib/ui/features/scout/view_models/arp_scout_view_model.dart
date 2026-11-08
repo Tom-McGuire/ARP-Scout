@@ -5,6 +5,7 @@ import '../../../../data/repositories/arp_repository.dart';
 import '../../../../data/services/import/csv_import_service.dart';
 import '../../../../data/services/oui/oui_lookup_service.dart';
 import '../../../../data/services/scanner/subnet_scanner_service.dart';
+import '../../../../data/services/storage/arp_scout_preferences_service.dart';
 import '../../../../domain/models/arp_filter.dart';
 import '../../../../domain/models/arp_host_record.dart';
 import '../../../../domain/models/host_status.dart';
@@ -46,6 +47,12 @@ class ArpScoutViewModel extends ChangeNotifier {
   ArpHostRecord? _selectedRecord;
   Timer? _watchTimer;
   StreamSubscription<void>? _sharedDbSubscription;
+  bool _isDisposed = false;
+
+  bool _showAutoDetected = false;
+  Set<String> _hiddenDeviceMacs = {};
+  List<SharedDevice> _sharedDevices = [];
+  Map<String, int> _deviceCounts = {};
 
   List<NetworkAdapterInfo> get adapters => _adapters;
   NetworkAdapterInfo get selectedAdapter => _selectedAdapter;
@@ -53,6 +60,7 @@ class ArpScoutViewModel extends ChangeNotifier {
   ScanProgress get scanProgress => _scanProgress;
   List<ArpHostRecord> get hosts => _hosts;
   Map<HostStatus, int> get statusCounts => _statusCounts;
+  Map<String, int> get deviceCounts => _deviceCounts;
   int get totalHostCount => _totalHostCount;
   int get unfilteredTotalCount => _unfilteredTotalCount;
   int get conflictCount => _statusCounts[HostStatus.conflict] ?? 0;
@@ -66,9 +74,40 @@ class ArpScoutViewModel extends ChangeNotifier {
   bool get isScanningOrWatching =>
       _scanProgress.isScanning || _scanProgress.isContinuousWatch;
 
+  bool get showAutoDetected => _showAutoDetected;
+  Set<String> get hiddenDeviceMacs => _hiddenDeviceMacs;
+
+  /// Returns all labeled devices from SharedDeviceDatabase that are not hidden in ARP Scout.
+  List<SharedDevice> get visibleSharedDevices {
+    return _sharedDevices
+        .where((d) => d.hasCustomName && !_hiddenDeviceMacs.contains(d.macAddress))
+        .toList();
+  }
+
+  /// Returns active auto-detected hosts currently in the ARP table that do not have
+  /// a custom labeled entry in visibleSharedDevices and are not hidden.
+  List<ArpHostRecord> get autoDetectedUnlabeledHosts {
+    if (!_showAutoDetected) return const [];
+    final labeledMacs = visibleSharedDevices.map((d) => d.macAddress).toSet();
+    final seen = <String>{};
+    final result = <ArpHostRecord>[];
+    for (final host in _hosts) {
+      final mac = host.macAddress.toUpperCase();
+      if (!labeledMacs.contains(mac) &&
+          !_hiddenDeviceMacs.contains(mac) &&
+          seen.add(mac)) {
+        result.add(host);
+      }
+    }
+    return result;
+  }
+
   Future<void> _init() async {
+    await _loadPreferences();
+    if (_isDisposed) return;
     _initSharedDbListener();
     await refreshAdapters();
+    if (_isDisposed) return;
     if (initialAdapterIp != null || initialAdapterName != null) {
       selectMatchingAdapter(
         adapterIp: initialAdapterIp,
@@ -83,6 +122,86 @@ class ArpScoutViewModel extends ChangeNotifier {
     if (initialAutoStart) {
       unawaited(startSubnetScan(subnetOverride: initialSubnet));
     }
+  }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final prefs = await ArpScoutPreferencesService.loadPreferences();
+      _showAutoDetected = prefs.showAutoDetected;
+      _hiddenDeviceMacs = prefs.hiddenDeviceMacs;
+    } catch (_) {}
+    _refreshSharedDevices();
+  }
+
+  void _refreshSharedDevices() {
+    _sharedDevices = _repository.getAllSharedDevices();
+  }
+
+  void setShowAutoDetected(bool value) {
+    if (_showAutoDetected == value) return;
+    _showAutoDetected = value;
+    ArpScoutPreferencesService.savePreferences(
+      ArpScoutPreferences(
+        showAutoDetected: _showAutoDetected,
+        hiddenDeviceMacs: _hiddenDeviceMacs,
+      ),
+    );
+    notifyListeners();
+  }
+
+  void toggleDeviceVisibility(String mac) {
+    final normalized = SharedDevice.normalizeMac(mac);
+    if (_hiddenDeviceMacs.contains(normalized)) {
+      _hiddenDeviceMacs = Set.from(_hiddenDeviceMacs)..remove(normalized);
+    } else {
+      _hiddenDeviceMacs = Set.from(_hiddenDeviceMacs)..add(normalized);
+      if (_filter.selectedDeviceMacs.contains(normalized)) {
+        toggleDevicePill(normalized);
+      }
+    }
+    ArpScoutPreferencesService.savePreferences(
+      ArpScoutPreferences(
+        showAutoDetected: _showAutoDetected,
+        hiddenDeviceMacs: _hiddenDeviceMacs,
+      ),
+    );
+    notifyListeners();
+  }
+
+  void toggleDevicePill(String mac) {
+    final normalized = SharedDevice.normalizeMac(mac);
+    final current = Set<String>.from(_filter.selectedDeviceMacs);
+    if (current.contains(normalized)) {
+      current.remove(normalized);
+    } else {
+      current.add(normalized);
+    }
+    _filter = _filter.copyWith(selectedDeviceMacs: current);
+    _refreshQuery();
+  }
+
+  void clearDeviceFilters() {
+    if (_filter.selectedDeviceMacs.isEmpty) return;
+    _filter = _filter.copyWith(selectedDeviceMacs: const {});
+    _refreshQuery();
+  }
+
+  void updateDeviceMetadata({
+    required String mac,
+    required String name,
+    String? category,
+    String? vendor,
+    String? notes,
+  }) {
+    _repository.updateDeviceDetails(
+      macAddress: mac,
+      name: name,
+      deviceType: category,
+      vendor: vendor,
+      notes: notes,
+    );
+    _refreshSharedDevices();
+    _refreshQuery();
   }
 
   void _initSharedDbListener() {
@@ -541,9 +660,11 @@ class ArpScoutViewModel extends ChangeNotifier {
   Future<String?> exportJson() => _repository.exportJson(_filter);
 
   void _refreshQuery({bool notify = true}) {
+    _refreshSharedDevices();
     _totalHostCount = _repository.countHosts(_filter);
     _unfilteredTotalCount = _repository.totalUnfilteredCount();
-    _statusCounts = _repository.getStatusCounts();
+    _statusCounts = _repository.getStatusCounts(_filter);
+    _deviceCounts = _repository.getDeviceHostCounts(_filter);
     final currentLimit = _hosts.length > pageSize ? _hosts.length : pageSize;
     _hosts = _repository.queryHosts(
       offset: 0,
@@ -568,7 +689,14 @@ class ArpScoutViewModel extends ChangeNotifier {
   }
 
   @override
+  void notifyListeners() {
+    if (_isDisposed) return;
+    super.notifyListeners();
+  }
+
+  @override
   void dispose() {
+    _isDisposed = true;
     _watchTimer?.cancel();
     _sharedDbSubscription?.cancel();
     _repository.dispose();

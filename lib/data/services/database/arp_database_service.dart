@@ -431,20 +431,60 @@ class ArpDatabaseService {
   }
 
   /// Status counts for quick filter chips and conflict alert banner.
-  Map<HostStatus, int> getStatusCounts() {
+  /// When [filter] is provided, status counts reflect active criteria (search, IP, MAC, vendor, and selected devices)
+  /// excluding status, making counters react dynamically to device selections.
+  Map<HostStatus, int> getStatusCounts([ArpFilterCriteria? filter]) {
     final counts = <HostStatus, int>{
       for (final s in HostStatus.values) s: 0,
     };
-    final result = _db.select('''
-      SELECT status, COUNT(*) as count
-      FROM arp_hosts
-      GROUP BY status
-    ''');
+    final sql = StringBuffer('SELECT status, COUNT(*) as count FROM arp_hosts');
+    final params = <Object?>[];
+    if (filter != null) {
+      final (whereClause, whereParams) =
+          _buildWhereClause(filter, excludeStatus: true);
+      if (whereClause.isNotEmpty) {
+        sql.write(' WHERE $whereClause');
+        params.addAll(whereParams);
+      }
+    }
+    sql.write(' GROUP BY status');
+
+    final result = _db.select(sql.toString(), params);
     for (final row in result) {
       final code = row['status'] as int;
       final count = row['count'] as int;
       final status = HostStatus.fromCode(code);
       counts[status] = count;
+    }
+    return counts;
+  }
+
+  /// Returns a map of MAC address to matching host count in the local database.
+  /// When [filter] is provided, device counts reflect other active criteria (e.g. status triage),
+  /// making device counters react dynamically when a status chip like "ARP ONLY" is selected.
+  Map<String, int> getDeviceHostCounts([ArpFilterCriteria? filter]) {
+    final counts = <String, int>{};
+    final sql = StringBuffer(
+      'SELECT mac_address, COUNT(*) as count FROM arp_hosts',
+    );
+    final params = <Object?>[];
+    if (filter != null) {
+      final (whereClause, whereParams) =
+          _buildWhereClause(filter, excludeDevices: true);
+      if (whereClause.isNotEmpty) {
+        sql.write(' WHERE $whereClause');
+        params.addAll(whereParams);
+      }
+    }
+    sql.write(' GROUP BY mac_address');
+
+    final result = _db.select(sql.toString(), params);
+    for (final row in result) {
+      final mac = row['mac_address'] as String?;
+      final count = row['count'] as int? ?? 0;
+      if (mac != null && mac.isNotEmpty) {
+        counts[mac.toUpperCase()] = count;
+      }
     }
     return counts;
   }
@@ -463,7 +503,11 @@ class ArpDatabaseService {
         .replaceAll('_', r'\_');
   }
 
-  (String, List<Object?>) _buildWhereClause(ArpFilterCriteria filter) {
+  (String, List<Object?>) _buildWhereClause(
+    ArpFilterCriteria filter, {
+    bool excludeStatus = false,
+    bool excludeDevices = false,
+  }) {
     final clauses = <String>[];
     final params = <Object?>[];
 
@@ -518,15 +562,40 @@ class ArpDatabaseService {
       params.add(q);
     }
 
-    // Conflicts only toggle
-    if (filter.conflictsOnly) {
-      clauses.add('status = ?');
-      params.add(HostStatus.conflict.code);
-    } else if (filter.selectedStatuses.isNotEmpty &&
-        filter.selectedStatuses.length < HostStatus.values.length) {
-      final placeholders = List.filled(filter.selectedStatuses.length, '?').join(',');
-      clauses.add('status IN ($placeholders)');
-      params.addAll(filter.selectedStatuses.map((s) => s.code));
+    // Selected Device MACs filter
+    if (!excludeDevices && filter.selectedDeviceMacs.isNotEmpty) {
+      final macPlaceholders =
+          List.filled(filter.selectedDeviceMacs.length, '?').join(',');
+      final cleanMacs = filter.selectedDeviceMacs
+          .map(_cleanMacHex)
+          .where((s) => s.isNotEmpty)
+          .toList();
+      if (cleanMacs.isNotEmpty) {
+        final cleanPlaceholders =
+            List.filled(cleanMacs.length, '?').join(',');
+        clauses.add(
+          '(mac_address IN ($macPlaceholders) OR mac_clean IN ($cleanPlaceholders))',
+        );
+        params.addAll(filter.selectedDeviceMacs);
+        params.addAll(cleanMacs);
+      } else {
+        clauses.add('mac_address IN ($macPlaceholders)');
+        params.addAll(filter.selectedDeviceMacs);
+      }
+    }
+
+    // Status / Conflicts filters
+    if (!excludeStatus) {
+      if (filter.conflictsOnly) {
+        clauses.add('status = ?');
+        params.add(HostStatus.conflict.code);
+      } else if (filter.selectedStatuses.isNotEmpty &&
+          filter.selectedStatuses.length < HostStatus.values.length) {
+        final placeholders =
+            List.filled(filter.selectedStatuses.length, '?').join(',');
+        clauses.add('status IN ($placeholders)');
+        params.addAll(filter.selectedStatuses.map((s) => s.code));
+      }
     }
 
     return (clauses.join(' AND '), params);

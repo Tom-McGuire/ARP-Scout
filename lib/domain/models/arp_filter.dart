@@ -7,6 +7,7 @@ class ArpFilterCriteria {
     this.macFilter = '',
     this.vendorFilter = '',
     this.selectedStatuses = const {},
+    this.selectedDeviceMacs = const {},
     this.conflictsOnly = false,
     this.sortColumn = 'ip_numeric',
     this.sortAscending = true,
@@ -17,6 +18,7 @@ class ArpFilterCriteria {
   final String macFilter;
   final String vendorFilter;
   final Set<HostStatus> selectedStatuses;
+  final Set<String> selectedDeviceMacs;
   final bool conflictsOnly;
   final String sortColumn;
   final bool sortAscending;
@@ -27,6 +29,7 @@ class ArpFilterCriteria {
       macFilter.trim().isNotEmpty ||
       vendorFilter.trim().isNotEmpty ||
       conflictsOnly ||
+      selectedDeviceMacs.isNotEmpty ||
       (selectedStatuses.isNotEmpty &&
           selectedStatuses.length < HostStatus.values.length);
 
@@ -36,6 +39,7 @@ class ArpFilterCriteria {
     String? macFilter,
     String? vendorFilter,
     Set<HostStatus>? selectedStatuses,
+    Set<String>? selectedDeviceMacs,
     bool? conflictsOnly,
     String? sortColumn,
     bool? sortAscending,
@@ -46,6 +50,7 @@ class ArpFilterCriteria {
       macFilter: macFilter ?? this.macFilter,
       vendorFilter: vendorFilter ?? this.vendorFilter,
       selectedStatuses: selectedStatuses ?? this.selectedStatuses,
+      selectedDeviceMacs: selectedDeviceMacs ?? this.selectedDeviceMacs,
       conflictsOnly: conflictsOnly ?? this.conflictsOnly,
       sortColumn: sortColumn ?? this.sortColumn,
       sortAscending: sortAscending ?? this.sortAscending,

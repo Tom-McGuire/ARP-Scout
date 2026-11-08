@@ -1,8 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:network_suite_shared/network_suite_shared.dart';
 import 'package:provider/provider.dart';
+import '../../../../domain/models/arp_filter.dart';
+import '../../../../domain/models/arp_host_record.dart';
 import '../../../../domain/models/host_status.dart';
 import '../view_models/arp_scout_view_model.dart';
+import 'dialogs/device_library_dialog.dart';
+import 'dialogs/edit_device_dialog.dart';
 
 class ArpFilterBar extends StatefulWidget {
   const ArpFilterBar({super.key});
@@ -59,6 +64,7 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
     final vm = context.watch<ArpScoutViewModel>();
     final filter = vm.filter;
     final statusCounts = vm.statusCounts;
+    final deviceCounts = vm.deviceCounts;
 
     _syncControllersWithFilter(vm);
 
@@ -224,6 +230,11 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
                 ),
               ),
 
+              const SizedBox(width: 8),
+
+              // Auto-Detected Switch
+              _buildAutoDetectedSwitch(context, vm),
+
               if (filter.hasActiveFilter) ...[
                 const SizedBox(width: 10),
                 TextButton.icon(
@@ -253,13 +264,105 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
           const SizedBox(height: 8),
 
           // Row 2: Status & Conflict Triage Chips
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          _buildStatusTriageRow(context, vm, filter, statusCounts),
+
+          const SizedBox(height: 8),
+
+          // Row 3: Devices Quick-Filter Row
+          _buildDevicesRow(context, vm, filter, deviceCounts),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusTriageRow(
+    BuildContext context,
+    ArpScoutViewModel vm,
+    ArpFilterCriteria filter,
+    Map<HostStatus, int> statusCounts,
+  ) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const Text(
+          'STATUS TRIAGE:',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(width: 4),
+        ...HostStatus.values.map((status) {
+          final isSelected = filter.selectedStatuses.contains(status);
+          final count = statusCounts[status] ?? 0;
+
+          return FilterChip(
+            selected: isSelected,
+            showCheckmark: false,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+            avatar: CircleAvatar(
+              radius: 5,
+              backgroundColor: status.color,
+            ),
+            label: Text(
+              '${status.label} ($count)',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ||
+                        (status == HostStatus.conflict && count > 0)
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+                color: isSelected
+                    ? Colors.white
+                    : (status == HostStatus.conflict && count > 0
+                          ? const Color(0xFFFCA5A5)
+                          : Colors.grey.shade400),
+              ),
+            ),
+            selectedColor: status.color.withValues(alpha: 0.35),
+            backgroundColor: const Color(0xFF252526),
+            side: BorderSide(
+              color: isSelected
+                  ? status.color
+                  : (status == HostStatus.conflict && count > 0
+                        ? status.color.withValues(alpha: 0.6)
+                        : const Color(0xFF3E3E42)),
+              width: 1,
+            ),
+            onSelected: (_) => vm.toggleStatus(status),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildDevicesRow(
+    BuildContext context,
+    ArpScoutViewModel vm,
+    ArpFilterCriteria filter,
+    Map<String, int> deviceCounts,
+  ) {
+    final visibleShared = vm.visibleSharedDevices;
+    final autoDetected = vm.autoDetectedUnlabeledHosts;
+    final selectedMacs = filter.selectedDeviceMacs;
+
+    return Row(
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(right: 8.0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'STATUS TRIAGE:',
+              Icon(Icons.devices, size: 14, color: Colors.blueAccent),
+              SizedBox(width: 4),
+              Text(
+                'DEVICES:',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
@@ -267,54 +370,361 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
                   letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(width: 4),
-              ...HostStatus.values.map((status) {
-                final isSelected = filter.selectedStatuses.contains(status);
-                final count = statusCounts[status] ?? 0;
-
-                return FilterChip(
-                  selected: isSelected,
-                  showCheckmark: false,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                  avatar: Icon(
-                    status.icon,
-                    size: 13,
-                    color: status.color,
-                  ),
-                  label: Text(
-                    '${status.label} ($count)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isSelected ||
-                              (status == HostStatus.conflict && count > 0)
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: isSelected
-                          ? Colors.white
-                          : (status == HostStatus.conflict && count > 0
-                                ? const Color(0xFFFCA5A5)
-                                : Colors.grey.shade400),
-                    ),
-                  ),
-                  selectedColor: status.color.withValues(alpha: 0.35),
-                  backgroundColor: const Color(0xFF252526),
-                  side: BorderSide(
-                    color: isSelected
-                        ? status.color
-                        : (status == HostStatus.conflict && count > 0
-                              ? status.color.withValues(alpha: 0.6)
-                              : const Color(0xFF3E3E42)),
-                    width: 1,
-                  ),
-                  onSelected: (_) => vm.toggleStatus(status),
-                );
-              }),
             ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // 1. Shared Library Devices
+                ...visibleShared.map((device) {
+                  final normMac = SharedDevice.normalizeMac(device.macAddress);
+                  final isSelected = selectedMacs.contains(normMac);
+                  final count = deviceCounts[normMac] ?? 0;
+                  final catColor = _getCategoryColor(device.deviceType);
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6.0),
+                    child: GestureDetector(
+                      onSecondaryTapDown: (details) =>
+                          _showDeviceMenu(context, details, device, vm),
+                      child: FilterChip(
+                        selected: isSelected,
+                        showCheckmark: false,
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        avatar: CircleAvatar(
+                          radius: 5,
+                          backgroundColor: catColor,
+                        ),
+                        label: Text(
+                          '${device.name} ($count)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? Colors.white : Colors.grey.shade400,
+                          ),
+                        ),
+                        selectedColor: catColor.withValues(alpha: 0.35),
+                        backgroundColor: const Color(0xFF252526),
+                        side: BorderSide(
+                          color: isSelected ? catColor : const Color(0xFF3E3E42),
+                          width: 1,
+                        ),
+                        onSelected: (_) => vm.toggleDevicePill(device.macAddress),
+                        tooltip: 'MAC: ${device.macAddress}\nRight-click for options',
+                      ),
+                    ),
+                  );
+                }),
+
+                if (vm.showAutoDetected && autoDetected.isNotEmpty) ...[
+                  if (visibleShared.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      height: 18,
+                      width: 1,
+                      color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+
+                  // 2. Auto-Detected Unlabeled Hosts
+                  ...autoDetected.map((host) {
+                    final normMac = SharedDevice.normalizeMac(host.macAddress);
+                    final isSelected = selectedMacs.contains(normMac);
+                    final count = deviceCounts[normMac] ?? 0;
+                    final displayName = (host.hostname != null && host.hostname!.trim().isNotEmpty)
+                        ? host.hostname!.trim()
+                        : host.ipAddress;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6.0),
+                      child: GestureDetector(
+                        onSecondaryTapDown: (details) =>
+                            _showAutoDetectedDeviceMenu(context, details, host, vm),
+                        child: FilterChip(
+                          selected: isSelected,
+                          showCheckmark: false,
+                          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          avatar: const CircleAvatar(
+                            radius: 5,
+                            backgroundColor: Colors.grey,
+                          ),
+                          label: Text(
+                            '$displayName ($count)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected ? Colors.white : Colors.grey.shade400,
+                            ),
+                          ),
+                          selectedColor: Colors.blueAccent.withValues(alpha: 0.35),
+                          backgroundColor: const Color(0xFF252526),
+                          side: BorderSide(
+                            color: isSelected ? Colors.blueAccent : const Color(0xFF3E3E42),
+                            width: 1,
+                          ),
+                          onSelected: (_) => vm.toggleDevicePill(host.macAddress),
+                          tooltip: 'Auto-detected host (${host.macAddress})\nRight-click to label or hide',
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+
+                // 3. Manage ActionChip
+                Padding(
+                  padding: const EdgeInsets.only(right: 6.0),
+                  child: ActionChip(
+                    avatar: const Icon(Icons.settings_outlined, size: 13),
+                    label: const Text('Manage', style: TextStyle(fontSize: 11)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    backgroundColor: const Color(0xFF252526),
+                    side: const BorderSide(color: Color(0xFF3E3E42), width: 1),
+                    tooltip: 'Manage device library and visibility in ARP Scout',
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => ChangeNotifierProvider.value(
+                          value: vm,
+                          child: const DeviceLibraryDialog(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAutoDetectedSwitch(BuildContext context, ArpScoutViewModel vm) {
+    return Container(
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: vm.showAutoDetected
+            ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+            : const Color(0xFF252526),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: vm.showAutoDetected
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)
+              : const Color(0xFF3E3E42),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.sensors,
+            size: 14,
+            color: vm.showAutoDetected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.grey,
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'Auto-Detected',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            height: 20,
+            width: 32,
+            child: FittedBox(
+              fit: BoxFit.contain,
+              child: Switch(
+                value: vm.showAutoDetected,
+                onChanged: (val) => vm.setShowAutoDetected(val),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Color _getCategoryColor(String? deviceType) {
+    final cat = DeviceCategory.fromKey(deviceType);
+    switch (cat) {
+      case DeviceCategory.pc:
+      case DeviceCategory.laptop:
+        return Colors.blueAccent;
+      case DeviceCategory.server:
+        return Colors.purpleAccent;
+      case DeviceCategory.router:
+        return Colors.cyanAccent;
+      case DeviceCategory.switchDevice:
+        return Colors.tealAccent;
+      case DeviceCategory.accessPoint:
+        return Colors.lightBlueAccent;
+      case DeviceCategory.mobile:
+        return Colors.greenAccent;
+      case DeviceCategory.printer:
+        return Colors.orangeAccent;
+      case DeviceCategory.nas:
+        return Colors.amberAccent;
+      case DeviceCategory.iot:
+        return Colors.yellowAccent;
+      case DeviceCategory.camera:
+        return Colors.pinkAccent;
+      case DeviceCategory.other:
+        return Colors.blueGrey;
+    }
+  }
+
+  Future<void> _showDeviceMenu(
+    BuildContext context,
+    TapDownDetails details,
+    SharedDevice device,
+    ArpScoutViewModel vm,
+  ) async {
+    final position = RelativeRect.fromRect(
+      details.globalPosition & const Size(40, 40),
+      Offset.zero & MediaQuery.of(context).size,
+    );
+
+    final value = await showMenu<String>(
+      context: context,
+      position: position,
+      items: [
+        PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              const Icon(Icons.edit_outlined, size: 16),
+              const SizedBox(width: 8),
+              Text('Edit "${device.name}"'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'hide',
+          child: const Row(
+            children: [
+              Icon(Icons.visibility_off_outlined, size: 16),
+              SizedBox(width: 8),
+              Text('Hide in ARP Scout'),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (!context.mounted) return;
+
+    if (value == 'edit') {
+      showDialog(
+        context: context,
+        builder: (ctx) => EditDeviceDialog(
+          macAddress: device.macAddress,
+          initialName: device.name,
+          initialCategory: device.deviceType,
+          initialVendor: device.vendor,
+          initialNotes: device.notes,
+          onSave: ({
+            required String mac,
+            required String name,
+            String? category,
+            String? vendor,
+            String? notes,
+          }) {
+            vm.updateDeviceMetadata(
+              mac: mac,
+              name: name,
+              category: category,
+              vendor: vendor,
+              notes: notes,
+            );
+          },
+        ),
+      );
+    } else if (value == 'hide') {
+      vm.toggleDeviceVisibility(device.macAddress);
+    }
+  }
+
+  Future<void> _showAutoDetectedDeviceMenu(
+    BuildContext context,
+    TapDownDetails details,
+    ArpHostRecord host,
+    ArpScoutViewModel vm,
+  ) async {
+    final position = RelativeRect.fromRect(
+      details.globalPosition & const Size(40, 40),
+      Offset.zero & MediaQuery.of(context).size,
+    );
+
+    final value = await showMenu<String>(
+      context: context,
+      position: position,
+      items: [
+        PopupMenuItem(
+          value: 'label',
+          child: Row(
+            children: [
+              const Icon(Icons.label_outline, size: 16),
+              const SizedBox(width: 8),
+              Text('Label / Add to Library (${host.macAddress})'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'hide',
+          child: const Row(
+            children: [
+              Icon(Icons.visibility_off_outlined, size: 16),
+              SizedBox(width: 8),
+              Text('Hide in ARP Scout'),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (!context.mounted) return;
+
+    if (value == 'label') {
+      showDialog(
+        context: context,
+        builder: (ctx) => EditDeviceDialog(
+          macAddress: host.macAddress,
+          initialName: (host.hostname != null && host.hostname!.trim().isNotEmpty)
+              ? host.hostname!.trim()
+              : host.ipAddress,
+          initialCategory: 'other',
+          initialVendor: host.vendor,
+          onSave: ({
+            required String mac,
+            required String name,
+            String? category,
+            String? vendor,
+            String? notes,
+          }) {
+            vm.updateDeviceMetadata(
+              mac: mac,
+              name: name,
+              category: category,
+              vendor: vendor,
+              notes: notes,
+            );
+          },
+        ),
+      );
+    } else if (value == 'hide') {
+      vm.toggleDeviceVisibility(host.macAddress);
+    }
   }
 }

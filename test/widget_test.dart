@@ -340,7 +340,7 @@ IP Address,MAC Address,Vendor,Hostname,Device Name,Status
 
   group('ArpScoutApp Widget Test', () {
     testWidgets('renders 5-tier desktop layout, loads demo subnet, and filters by MAC/IP', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1440, 900));
+      await tester.binding.setSurfaceSize(const Size(1440, 1200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await tester.pumpWidget(const ArpScoutApp());

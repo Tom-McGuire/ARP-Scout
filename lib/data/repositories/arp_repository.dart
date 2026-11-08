@@ -212,8 +212,61 @@ class ArpRepository {
     return _dbService.totalUnfilteredCount();
   }
 
-  Map<HostStatus, int> getStatusCounts() {
-    return _dbService.getStatusCounts();
+  Map<HostStatus, int> getStatusCounts([ArpFilterCriteria? filter]) {
+    return _dbService.getStatusCounts(filter);
+  }
+
+  Map<String, int> getDeviceHostCounts([ArpFilterCriteria? filter]) {
+    return _dbService.getDeviceHostCounts(filter);
+  }
+
+  List<SharedDevice> getAllSharedDevices() {
+    if (SharedDeviceDatabase.instance.isInitialized) {
+      return SharedDeviceDatabase.instance.getAllDevices();
+    }
+    return [];
+  }
+
+  void updateDeviceDetails({
+    required String macAddress,
+    required String name,
+    String? deviceType,
+    String? vendor,
+    String? notes,
+  }) {
+    if (!SharedDevice.isValidMac(macAddress)) return;
+    final normalizedMac = SharedDevice.normalizeMac(macAddress);
+    final trimmedName = name.trim();
+
+    try {
+      if (SharedDeviceDatabase.instance.isInitialized) {
+        final existing = SharedDeviceDatabase.instance.getDeviceByMac(normalizedMac);
+        if (existing != null) {
+          SharedDeviceDatabase.instance.updateDeviceDetails(
+            normalizedMac,
+            name: trimmedName.isNotEmpty ? trimmedName : null,
+            deviceType: deviceType,
+            vendor: vendor,
+            notes: notes,
+          );
+        } else {
+          SharedDeviceDatabase.instance.upsertDevice(
+            SharedDevice(
+              macAddress: normalizedMac,
+              name: trimmedName.isNotEmpty ? trimmedName : 'Device $normalizedMac',
+              deviceType: deviceType,
+              vendor: vendor,
+              notes: notes,
+              sourceApp: 'ARP-Scout',
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+        }
+      }
+    } catch (_) {}
+
+    _dbService.updateCustomNameByMac(normalizedMac, trimmedName);
   }
 
   void clearAll() {
