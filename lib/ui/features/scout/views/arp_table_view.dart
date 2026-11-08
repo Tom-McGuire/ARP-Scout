@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'dart:math';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -733,14 +735,24 @@ class _ArpTableViewState extends State<ArpTableView> {
         Rect.fromLTWH(position.dx, position.dy, 0, 0),
         Rect.fromLTWH(0, 0, overlay.size.width, overlay.size.height),
       ),
+      constraints: BoxConstraints(
+        minWidth: 320.0,
+        maxWidth: (overlay.size.width - 40).clamp(480.0, 720.0),
+      ),
       items: [
         PopupMenuItem(
           value: 'trace_route',
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.alt_route, size: 16, color: Color(0xFF38BDF8)),
               const SizedBox(width: 8),
-              Text('Trace Route in Net Route Scout (${record.ipAddress})'),
+              Flexible(
+                child: Text(
+                  'Trace Route in Net Route Scout (${record.ipAddress})',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
@@ -748,10 +760,16 @@ class _ArpTableViewState extends State<ArpTableView> {
         PopupMenuItem(
           value: 'edit_name',
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.edit_note, size: 16, color: Color(0xFF38BDF8)),
               const SizedBox(width: 8),
-              Text('Edit Device Name (${record.displayName})...'),
+              Flexible(
+                child: Text(
+                  'Edit Device Name (${record.displayName})...',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
@@ -759,30 +777,48 @@ class _ArpTableViewState extends State<ArpTableView> {
         PopupMenuItem(
           value: 'copy_ip',
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.copy, size: 15),
               const SizedBox(width: 8),
-              Text('Copy IP (${record.ipAddress})'),
+              Flexible(
+                child: Text(
+                  'Copy IP (${record.ipAddress})',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
         PopupMenuItem(
           value: 'copy_mac',
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.memory, size: 15),
               const SizedBox(width: 8),
-              Text('Copy MAC (${record.macAddress})'),
+              Flexible(
+                child: Text(
+                  'Copy MAC (${record.macAddress})',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
         PopupMenuItem(
           value: 'copy_vendor',
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.business, size: 15),
               const SizedBox(width: 8),
-              Text('Copy Vendor (${record.vendor})'),
+              Flexible(
+                child: Text(
+                  'Copy Vendor (${record.vendor})',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
@@ -790,30 +826,48 @@ class _ArpTableViewState extends State<ArpTableView> {
         PopupMenuItem(
           value: 'filter_mac',
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.filter_alt, size: 15),
               const SizedBox(width: 8),
-              Text('Search by MAC: ${record.macAddress}'),
+              Flexible(
+                child: Text(
+                  'Search by MAC: ${record.macAddress}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
         PopupMenuItem(
           value: 'filter_oui',
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.filter_alt_outlined, size: 15),
               const SizedBox(width: 8),
-              Text('Filter by OUI Prefix: $ouiPrefix'),
+              Flexible(
+                child: Text(
+                  'Filter by OUI Prefix: $ouiPrefix',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
         PopupMenuItem(
           value: 'filter_vendor',
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.domain, size: 15),
               const SizedBox(width: 8),
-              Text('Filter by Vendor: ${record.vendor}'),
+              Flexible(
+                child: Text(
+                  'Filter by Vendor: ${record.vendor}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
@@ -821,16 +875,23 @@ class _ArpTableViewState extends State<ArpTableView> {
         const PopupMenuItem(
           value: 'reprobe',
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.radar, size: 15, color: Color(0xFF10B981)),
               SizedBox(width: 8),
-              Text('Re-probe Host (ICMP + ARP)'),
+              Flexible(
+                child: Text(
+                  'Re-probe Host (ICMP + ARP)',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
         const PopupMenuItem(
           value: 'simulate_conflict',
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.warning_amber_rounded,
@@ -838,7 +899,12 @@ class _ArpTableViewState extends State<ArpTableView> {
                 color: Color(0xFFF59E0B),
               ),
               SizedBox(width: 8),
-              Text('Simulate Gratuitous ARP Conflict on this IP'),
+              Flexible(
+                child: Text(
+                  'Simulate Gratuitous ARP Conflict on this IP',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
@@ -903,13 +969,95 @@ class _ArpTableViewState extends State<ArpTableView> {
       }
     } catch (e) {
       if (context.mounted) {
+        final errText = e.toString().replaceAll("Exception: ", "");
+        if (errText.toLowerCase().contains('not found')) {
+          await _promptLocateRouteScout(context, vm, record);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not launch Net Route Scout: $errText'),
+              backgroundColor: const Color(0xFFEF4444),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _promptLocateRouteScout(
+    BuildContext context,
+    ArpScoutViewModel vm,
+    ArpHostRecord record,
+  ) async {
+    final expectedName = Platform.isWindows
+        ? 'net_route_scout.exe'
+        : (Platform.isMacOS ? 'Net Route Scout.app' : 'net_route_scout');
+
+    final shouldBrowse = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Row(
+          children: [
+            Icon(Icons.alt_route, size: 20, color: Color(0xFF38BDF8)),
+            SizedBox(width: 8),
+            Text('Locate Net Route Scout', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Text(
+          'Net Route Scout ($expectedName) could not be located in standard directories.\n\nWould you like to browse and select where Net Route Scout is installed on your computer?',
+          style: const TextStyle(fontSize: 13, color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.folder_open, size: 16),
+            label: const Text('Browse...'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF38BDF8),
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldBrowse != true || !context.mounted) return;
+
+    try {
+      final pickedFiles = await FilePicker.pickFiles(
+        dialogTitle: 'Select Net Route Scout ($expectedName)',
+        type: Platform.isWindows ? FileType.custom : FileType.any,
+        allowedExtensions: Platform.isWindows ? ['exe'] : null,
+      );
+
+      if (pickedFiles.isEmpty) return;
+      final path = pickedFiles.single.path;
+      if (path == null) return;
+
+      await InterAppLauncher.saveRouteScoutPath(path);
+
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Could not launch Net Route Scout: ${e.toString().replaceAll("Exception: ", "")}',
-            ),
+            content: Text('Saved Net Route Scout location: $path'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        // Automatically launch the trace with the newly configured path
+        await _launchRouteTrace(context, vm, record);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to select file: $e'),
             backgroundColor: const Color(0xFFEF4444),
-            duration: const Duration(seconds: 4),
           ),
         );
       }

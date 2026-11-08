@@ -86,6 +86,7 @@ void main() {
     test('cold launch triggers process starter when socket connect fails', () async {
       String? launchedExecutable;
       List<String>? launchedArguments;
+      String? launchedWorkingDirectory;
       ProcessStartMode? launchedMode;
 
       InterAppLauncher.socketConnector = (host, port, {sourceAddress, int sourcePort = 0, timeout}) async {
@@ -97,6 +98,7 @@ void main() {
       InterAppLauncher.processStarter = (executable, arguments, {environment, bool includeParentEnvironment = true, ProcessStartMode mode = ProcessStartMode.normal, bool runInShell = false, workingDirectory}) async {
         launchedExecutable = executable;
         launchedArguments = arguments;
+        launchedWorkingDirectory = workingDirectory;
         launchedMode = mode;
         return _MockProcess();
       };
@@ -108,6 +110,7 @@ void main() {
       );
 
       expect(launchedExecutable, equals('/mock/path/net_route_scout'));
+      expect(launchedWorkingDirectory, equals('/mock/path'));
       expect(launchedArguments, containsAllInOrder(['--target', '192.168.1.50']));
       expect(launchedArguments, containsAllInOrder(['--adapter-ip', '192.168.1.150']));
       expect(launchedArguments, containsAllInOrder(['--adapter-name', 'eth0']));
@@ -158,6 +161,28 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('getSavedRouteScoutPath and saveRouteScoutPath manage custom path', () async {
+      InterAppLauncher.customRouteScoutPath = null;
+      await InterAppLauncher.clearSavedRouteScoutPath();
+
+      // In-memory or saved custom path
+      InterAppLauncher.customRouteScoutPath = Platform.resolvedExecutable;
+      final retrieved = await InterAppLauncher.getSavedRouteScoutPath();
+      expect(retrieved, equals(Platform.resolvedExecutable));
+
+      await InterAppLauncher.clearSavedRouteScoutPath();
+      expect(InterAppLauncher.customRouteScoutPath, isNull);
+    });
+
+    test('resolveRouteScoutExecutable returns non-null when sibling route-tracer exists', () async {
+      // In this repository workspace, ../route-tracer is checked out side by side
+      final resolved = await InterAppLauncher.resolveRouteScoutExecutable();
+      // On Linux development workstations, it may locate either the repo or system binary
+      if (resolved != null) {
+        expect(File(resolved).existsSync() || Directory(resolved).existsSync(), isTrue);
+      }
     });
   });
 }

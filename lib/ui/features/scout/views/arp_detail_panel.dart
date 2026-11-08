@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -702,13 +704,94 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
       }
     } catch (e) {
       if (context.mounted) {
+        final errText = e.toString().replaceAll("Exception: ", "");
+        if (errText.toLowerCase().contains('not found')) {
+          await _promptLocateRouteScout(context, vm, record);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not launch Net Route Scout: $errText'),
+              backgroundColor: const Color(0xFFEF4444),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _promptLocateRouteScout(
+    BuildContext context,
+    ArpScoutViewModel vm,
+    ArpHostRecord record,
+  ) async {
+    final expectedName = Platform.isWindows
+        ? 'net_route_scout.exe'
+        : (Platform.isMacOS ? 'Net Route Scout.app' : 'net_route_scout');
+
+    final shouldBrowse = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Row(
+          children: [
+            Icon(Icons.alt_route, size: 20, color: Color(0xFF38BDF8)),
+            SizedBox(width: 8),
+            Text('Locate Net Route Scout', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Text(
+          'Net Route Scout ($expectedName) could not be located in standard directories.\n\nWould you like to browse and select where Net Route Scout is installed on your computer?',
+          style: const TextStyle(fontSize: 13, color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.folder_open, size: 16),
+            label: const Text('Browse...'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF38BDF8),
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldBrowse != true || !context.mounted) return;
+
+    try {
+      final pickedFiles = await FilePicker.pickFiles(
+        dialogTitle: 'Select Net Route Scout ($expectedName)',
+        type: Platform.isWindows ? FileType.custom : FileType.any,
+        allowedExtensions: Platform.isWindows ? ['exe'] : null,
+      );
+
+      if (pickedFiles.isEmpty) return;
+      final path = pickedFiles.single.path;
+      if (path == null) return;
+
+      await InterAppLauncher.saveRouteScoutPath(path);
+
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Could not launch Net Route Scout: ${e.toString().replaceAll("Exception: ", "")}',
-            ),
+            content: Text('Saved Net Route Scout location: $path'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        await _launchRouteTrace(context, vm, record);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to select file: $e'),
             backgroundColor: const Color(0xFFEF4444),
-            duration: const Duration(seconds: 4),
           ),
         );
       }
