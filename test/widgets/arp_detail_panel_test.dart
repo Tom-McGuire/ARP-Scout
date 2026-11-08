@@ -97,6 +97,10 @@ void main() {
       expect(find.text('Network Gear / Cisco / Solaris (TTL 255)'), findsOneWidget);
       expect(find.text('DIAGNOSTIC NOTES: Primary distribution layer switch'), findsOneWidget);
 
+      // Inter-App Action button
+      expect(find.text('Trace Path to Host'), findsOneWidget);
+      expect(find.byTooltip('Trace Path to Host in Net Route Scout'), findsOneWidget);
+
       // Close button closes inspector
       await tester.tap(find.byTooltip('Close Detail Inspector'));
       await tester.pumpAndSettle();

@@ -12,12 +12,22 @@ import '../../../../domain/models/network_adapter_info.dart';
 import '../../../../domain/models/scan_progress.dart';
 
 class ArpScoutViewModel extends ChangeNotifier {
-  ArpScoutViewModel({ArpRepository? repository})
-    : _repository = repository ?? ArpRepository() {
+  ArpScoutViewModel({
+    ArpRepository? repository,
+    this.initialSubnet,
+    this.initialAdapterIp,
+    this.initialAdapterName,
+    bool autoStart = false,
+  })  : initialAutoStart = autoStart,
+        _repository = repository ?? ArpRepository() {
     _init();
   }
 
   final ArpRepository _repository;
+  final String? initialSubnet;
+  final String? initialAdapterIp;
+  final String? initialAdapterName;
+  final bool initialAutoStart;
   static const int pageSize = 500;
 
   List<NetworkAdapterInfo> _adapters = [NetworkAdapterInfo.all];
@@ -59,7 +69,20 @@ class ArpScoutViewModel extends ChangeNotifier {
   Future<void> _init() async {
     _initSharedDbListener();
     await refreshAdapters();
+    if (initialAdapterIp != null || initialAdapterName != null) {
+      selectMatchingAdapter(
+        adapterIp: initialAdapterIp,
+        adapterName: initialAdapterName,
+      );
+    }
+    final subnet = initialSubnet;
+    if (subnet != null && subnet.trim().isNotEmpty) {
+      updateTargetSubnet(subnet.trim());
+    }
     _refreshQuery();
+    if (initialAutoStart) {
+      unawaited(startSubnetScan(subnetOverride: initialSubnet));
+    }
   }
 
   void _initSharedDbListener() {
@@ -110,6 +133,63 @@ class ArpScoutViewModel extends ChangeNotifier {
       ),
     );
     notifyListeners();
+  }
+
+  /// Selects the local network adapter matching [adapterIp] (primary) or [adapterName] (secondary).
+  void selectMatchingAdapter({String? adapterIp, String? adapterName}) {
+    if (_adapters.isEmpty) return;
+
+    // 1. Primary match: by IP address (exact physical interface match)
+    if (adapterIp != null && adapterIp.trim().isNotEmpty) {
+      final targetIp = adapterIp.trim();
+      final match = _adapters.firstWhere(
+        (a) => a.ipAddress == targetIp,
+        orElse: () => NetworkAdapterInfo.all,
+      );
+      if (match != NetworkAdapterInfo.all) {
+        selectAdapter(match);
+        return;
+      }
+    }
+
+    // 2. Secondary match: by Interface Name (e.g. "eth0")
+    if (adapterName != null && adapterName.trim().isNotEmpty) {
+      final targetName = adapterName.trim().toLowerCase();
+      final match = _adapters.firstWhere(
+        (a) => a.name.toLowerCase() == targetName,
+        orElse: () => NetworkAdapterInfo.all,
+      );
+      if (match != NetworkAdapterInfo.all) {
+        selectAdapter(match);
+        return;
+      }
+    }
+  }
+
+  /// Handles incoming subnet scan command from CLI or IPC warm handoff from Net Route Scout.
+  Future<void> handleIncomingCommand({
+    String? subnet,
+    String? adapterIp,
+    String? adapterName,
+    bool autoStart = false,
+  }) async {
+    // If adapters are not yet refreshed or only have fallback, refresh them
+    if (_adapters.isEmpty ||
+        (_adapters.length == 1 && _adapters.first == NetworkAdapterInfo.all)) {
+      await refreshAdapters();
+    }
+
+    if (adapterIp != null || adapterName != null) {
+      selectMatchingAdapter(adapterIp: adapterIp, adapterName: adapterName);
+    }
+
+    if (subnet != null && subnet.trim().isNotEmpty) {
+      updateTargetSubnet(subnet.trim());
+    }
+
+    if (autoStart) {
+      await startSubnetScan(subnetOverride: subnet);
+    }
   }
 
   void updateTargetSubnet(String subnet) {

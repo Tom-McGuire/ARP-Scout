@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../../../data/services/ipc/inter_app_launcher.dart';
 import '../../../../data/services/oui/oui_lookup_service.dart';
 import '../../../../domain/models/arp_host_record.dart';
 import '../view_models/arp_scout_view_model.dart';
@@ -169,6 +170,19 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                     );
                   },
                 ),
+                const SizedBox(width: 4),
+
+                // Trace Path in Net Route Scout Button
+                IconButton(
+                  tooltip: 'Trace Path to Host in Net Route Scout',
+                  icon: const Icon(Icons.alt_route, size: 16, color: Color(0xFF38BDF8)),
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _launchRouteTrace(context, vm, record),
+                ),
 
                 // Close Inspector Button
                 IconButton(
@@ -299,6 +313,34 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
             ),
             const SizedBox(height: 12),
           ],
+
+          // Prominent Action Button: Trace Path to Host in Net Route Scout
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => _launchRouteTrace(context, vm, record),
+                  icon: const Icon(Icons.alt_route, size: 16),
+                  label: const Text('Trace Path to Host'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF38BDF8),
+                    foregroundColor: const Color(0xFF0F172A),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
 
           // Metadata Grid
           Wrap(
@@ -635,6 +677,42 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
         ),
       ],
     );
+  }
+
+  Future<void> _launchRouteTrace(
+    BuildContext context,
+    ArpScoutViewModel vm,
+    ArpHostRecord record,
+  ) async {
+    try {
+      await InterAppLauncher.launchRouteTrace(
+        targetIp: record.ipAddress,
+        currentAdapter: vm.selectedAdapter,
+        autoStart: true,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Launched route trace to ${record.ipAddress} in Net Route Scout',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not launch Net Route Scout: ${e.toString().replaceAll("Exception: ", "")}',
+            ),
+            backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _showEditDeviceNameDialog(

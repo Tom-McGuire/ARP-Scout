@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../../../data/services/ipc/inter_app_launcher.dart';
 import '../../../../domain/models/arp_host_record.dart';
 import '../../../../domain/models/host_status.dart';
 import '../view_models/arp_scout_view_model.dart';
@@ -524,26 +525,47 @@ class _ArpTableViewState extends State<ArpTableView> {
               ),
             ),
 
-            // 10. Notes / Conflict Details
+            // 10. Notes / Conflict Details & Quick Action
             SizedBox(
               width: widths[ArpTableColumn.notes],
-              child: Text(
-                record.notes.isNotEmpty
-                    ? record.notes
-                    : (record.associatedIps.length > 1
-                          ? 'Multi-Homed MAC also seen on: ${record.associatedIps.join(", ")}'
-                          : '${record.interfaceName} • ${record.arpType} ARP'),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: record.hasConflict
-                      ? const Color(0xFFFCA5A5)
-                      : Colors.white70,
-                  fontWeight: record.hasConflict
-                      ? FontWeight.w600
-                      : FontWeight.normal,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      record.notes.isNotEmpty
+                          ? record.notes
+                          : (record.associatedIps.length > 1
+                                ? 'Multi-Homed MAC also seen on: ${record.associatedIps.join(", ")}'
+                                : '${record.interfaceName} • ${record.arpType} ARP'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: record.hasConflict
+                            ? const Color(0xFFFCA5A5)
+                            : Colors.white70,
+                        fontWeight: record.hasConflict
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Tooltip(
+                    message: 'Trace Route in Net Route Scout (${record.ipAddress})',
+                    child: InkWell(
+                      onTap: () => _launchRouteTrace(context, vm, record),
+                      borderRadius: BorderRadius.circular(4),
+                      child: const Padding(
+                        padding: EdgeInsets.all(3),
+                        child: Icon(
+                          Icons.alt_route,
+                          size: 14,
+                          color: Color(0xFF38BDF8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -713,6 +735,17 @@ class _ArpTableViewState extends State<ArpTableView> {
       ),
       items: [
         PopupMenuItem(
+          value: 'trace_route',
+          child: Row(
+            children: [
+              const Icon(Icons.alt_route, size: 16, color: Color(0xFF38BDF8)),
+              const SizedBox(width: 8),
+              Text('Trace Route in Net Route Scout (${record.ipAddress})'),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
           value: 'edit_name',
           child: Row(
             children: [
@@ -813,6 +846,9 @@ class _ArpTableViewState extends State<ArpTableView> {
     ).then((value) {
       if (!context.mounted || value == null) return;
       switch (value) {
+        case 'trace_route':
+          _launchRouteTrace(context, vm, record);
+          break;
         case 'edit_name':
           _showEditDeviceNameDialog(context, vm, record);
           break;
@@ -842,6 +878,42 @@ class _ArpTableViewState extends State<ArpTableView> {
           break;
       }
     });
+  }
+
+  Future<void> _launchRouteTrace(
+    BuildContext context,
+    ArpScoutViewModel vm,
+    ArpHostRecord record,
+  ) async {
+    try {
+      await InterAppLauncher.launchRouteTrace(
+        targetIp: record.ipAddress,
+        currentAdapter: vm.selectedAdapter,
+        autoStart: true,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Launched route trace to ${record.ipAddress} in Net Route Scout',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not launch Net Route Scout: ${e.toString().replaceAll("Exception: ", "")}',
+            ),
+            backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _showEditDeviceNameDialog(
