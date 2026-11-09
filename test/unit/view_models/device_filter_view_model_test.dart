@@ -125,6 +125,48 @@ void main() {
       expect(viewModel.hosts.length, equals(2));
     });
 
+    test('allKnownCustomDevices and allUnknownDevices correctly separate labeled and unlabeled devices', () {
+      final known = viewModel.allKnownCustomDevices;
+      expect(known.length, equals(1));
+      expect(known.first.name, equals('Core Router'));
+
+      final unknown = viewModel.allUnknownDevices;
+      // AA:BB:CC:DD:EE:FF from DB (unnamed) + 11:22:33:44:55:66 from ARP table
+      expect(unknown.length, equals(2));
+      final unknownMacs = unknown.map((u) => u.macAddress).toSet();
+      expect(unknownMacs, contains('AA:BB:CC:DD:EE:FF'));
+      expect(unknownMacs, contains('11:22:33:44:55:66'));
+    });
+
+    test('explicitly unhiding an unknown device shows it even when showAutoDetected is false', () {
+      viewModel.setShowAutoDetected(false);
+      expect(viewModel.autoDetectedUnlabeledHosts, isEmpty);
+
+      // Unhide the unknown ARP host (11:22:33:44:55:66)
+      viewModel.toggleDeviceVisibility('11:22:33:44:55:66');
+      expect(viewModel.explicitlyShownMacs, contains('11:22:33:44:55:66'));
+      expect(viewModel.autoDetectedUnlabeledHosts.length, equals(1));
+      expect(viewModel.autoDetectedUnlabeledHosts.first.macAddress, equals('11:22:33:44:55:66'));
+
+      // Hide it again
+      viewModel.toggleDeviceVisibility('11:22:33:44:55:66');
+      expect(viewModel.explicitlyShownMacs, isNot(contains('11:22:33:44:55:66')));
+      expect(viewModel.autoDetectedUnlabeledHosts, isEmpty);
+    });
+
+    test('unhideAllDevices resets all overrides and enables showAutoDetected', () {
+      viewModel.setDeviceHidden('00:1A:2B:3C:4D:5E', true);
+      viewModel.toggleDeviceVisibility('11:22:33:44:55:66');
+      viewModel.setShowAutoDetected(false);
+
+      expect(viewModel.hiddenDeviceMacs, contains('00:1A:2B:3C:4D:5E'));
+
+      viewModel.unhideAllDevices();
+      expect(viewModel.hiddenDeviceMacs, isEmpty);
+      expect(viewModel.explicitlyShownMacs, isEmpty);
+      expect(viewModel.showAutoDetected, isTrue);
+    });
+
     test('interdependent combined counts: selecting status updates device counts', () {
       // Both hosts are online
       expect(viewModel.deviceCounts['00:1A:2B:3C:4D:5E'], equals(1));

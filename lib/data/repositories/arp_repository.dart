@@ -34,6 +34,7 @@ class ArpRepository {
   List<ArpHostRecord> syncWithSharedDevices(
     List<ArpHostRecord> records, {
     bool isImport = false,
+    bool isDemo = false,
   }) {
     if (records.isEmpty) return records;
     final results = List<ArpHostRecord>.from(records);
@@ -52,31 +53,34 @@ class ArpRepository {
 
           if (isImport && trimmedCustomName != null) {
             // During import, an explicitly specified custom name MUST update the shared devices database.
-            if (existing != null) {
-              SharedDeviceDatabase.instance.updateDeviceName(normalizedMac, trimmedCustomName);
-            } else {
-              final vendor = record.vendor.isNotEmpty && record.vendor != 'Unknown Vendor'
-                  ? record.vendor
-                  : OuiLookup.lookupVendor(normalizedMac);
-              final category = OuiLookup.inferCategory(vendor, trimmedCustomName);
-              SharedDeviceDatabase.instance.upsertDevice(
-                SharedDevice(
-                  macAddress: normalizedMac,
-                  name: trimmedCustomName,
-                  vendor: vendor,
-                  deviceType: category.key,
-                  notes: 'Imported by arp-scout (${record.ipAddress})',
-                  sourceApp: 'arp-scout',
-                  createdAt: DateTime.now(),
-                  updatedAt: DateTime.now(),
-                ),
-              );
+            if (!isDemo) {
+              if (existing != null) {
+                SharedDeviceDatabase.instance.updateDeviceName(normalizedMac, trimmedCustomName);
+              } else {
+                final vendor = record.vendor.isNotEmpty && record.vendor != 'Unknown Vendor'
+                    ? record.vendor
+                    : OuiLookup.lookupVendor(normalizedMac);
+                final category = OuiLookup.inferCategory(vendor, trimmedCustomName);
+                SharedDeviceDatabase.instance.upsertDevice(
+                  SharedDevice(
+                    macAddress: normalizedMac,
+                    name: trimmedCustomName,
+                    vendor: vendor,
+                    deviceType: category.key,
+                    notes: 'Imported by arp-scout (${record.ipAddress})',
+                    sourceApp: 'arp-scout',
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                  ),
+                );
+              }
             }
             results[i] = record.copyWith(customName: trimmedCustomName);
           } else if (existing != null) {
             // If importing and existing device only had a placeholder 'Device AA:BB:...' name,
             // update it if the imported record has a real hostname.
             if (isImport &&
+                !isDemo &&
                 existing.name == 'Device $normalizedMac' &&
                 record.hostname != null &&
                 record.hostname!.trim().isNotEmpty) {
@@ -87,29 +91,34 @@ class ArpRepository {
               results[i] = record.copyWith(customName: existing.name);
             }
           } else {
-            // Register newly discovered or imported device into SharedDeviceDatabase
-            final vendor = record.vendor.isNotEmpty && record.vendor != 'Unknown Vendor'
-                ? record.vendor
-                : OuiLookup.lookupVendor(normalizedMac);
+            // Register newly discovered or imported device into SharedDeviceDatabase (skipped for demo data)
             final nameCandidate = trimmedCustomName ??
                 (record.hostname != null && record.hostname!.trim().isNotEmpty
                     ? record.hostname!.trim()
                     : 'Device $normalizedMac');
-            final category = OuiLookup.inferCategory(vendor, nameCandidate);
-            final device = SharedDevice(
-              macAddress: normalizedMac,
-              name: nameCandidate,
-              vendor: vendor,
-              deviceType: category.key,
-              notes: isImport
-                  ? 'Imported by arp-scout (${record.ipAddress})'
-                  : 'Discovered by arp-scout (${record.ipAddress})',
-              sourceApp: 'arp-scout',
-              createdAt: DateTime.now(),
-              updatedAt: DateTime.now(),
-            );
-            SharedDeviceDatabase.instance.upsertDevice(device);
-            results[i] = record.copyWith(customName: device.name);
+
+            if (!isDemo) {
+              final vendor = record.vendor.isNotEmpty && record.vendor != 'Unknown Vendor'
+                  ? record.vendor
+                  : OuiLookup.lookupVendor(normalizedMac);
+              final category = OuiLookup.inferCategory(vendor, nameCandidate);
+              final device = SharedDevice(
+                macAddress: normalizedMac,
+                name: nameCandidate,
+                vendor: vendor,
+                deviceType: category.key,
+                notes: isImport
+                    ? 'Imported by arp-scout (${record.ipAddress})'
+                    : 'Discovered by arp-scout (${record.ipAddress})',
+                sourceApp: 'arp-scout',
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              );
+              SharedDeviceDatabase.instance.upsertDevice(device);
+              results[i] = record.copyWith(customName: device.name);
+            } else {
+              results[i] = record.copyWith(customName: nameCandidate);
+            }
           }
         }
       } catch (e) {
@@ -171,8 +180,8 @@ class ArpRepository {
     }
   }
 
-  void upsertBatch(List<ArpHostRecord> records, {bool isImport = false}) {
-    final synced = syncWithSharedDevices(records, isImport: isImport);
+  void upsertBatch(List<ArpHostRecord> records, {bool isImport = false, bool isDemo = false}) {
+    final synced = syncWithSharedDevices(records, isImport: isImport, isDemo: isDemo);
     _dbService.upsertBatch(synced);
   }
 
@@ -277,7 +286,7 @@ class ArpRepository {
     final demoRecords = DemoArpGenerator.generateEnterpriseSubnet(
       subnetCidr: subnetCidr,
     );
-    upsertBatch(demoRecords);
+    upsertBatch(demoRecords, isDemo: true);
   }
 
   Future<List<ArpHostRecord>> performSubnetSweep({

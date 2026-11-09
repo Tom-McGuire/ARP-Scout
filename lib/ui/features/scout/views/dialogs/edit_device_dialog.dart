@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:network_suite_shared/network_suite_shared.dart';
+import 'package:arp_scout/data/services/oui/oui_lookup_service.dart';
 
 class EditDeviceDialog extends StatefulWidget {
   const EditDeviceDialog({
@@ -9,6 +10,7 @@ class EditDeviceDialog extends StatefulWidget {
     this.initialCategory,
     this.initialVendor,
     this.initialNotes,
+    this.initialIp,
     required this.onSave,
   });
 
@@ -17,6 +19,7 @@ class EditDeviceDialog extends StatefulWidget {
   final String? initialCategory;
   final String? initialVendor;
   final String? initialNotes;
+  final String? initialIp;
   final void Function({
     required String mac,
     required String name,
@@ -25,19 +28,52 @@ class EditDeviceDialog extends StatefulWidget {
     String? notes,
   }) onSave;
 
+  static Future<void> show(
+    BuildContext context, {
+    required String macAddress,
+    String? initialName,
+    String? initialCategory,
+    String? initialVendor,
+    String? initialNotes,
+    String? initialIp,
+    required void Function({
+      required String mac,
+      required String name,
+      String? category,
+      String? vendor,
+      String? notes,
+    }) onSave,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => EditDeviceDialog(
+        macAddress: macAddress,
+        initialName: initialName,
+        initialCategory: initialCategory,
+        initialVendor: initialVendor,
+        initialNotes: initialNotes,
+        initialIp: initialIp,
+        onSave: onSave,
+      ),
+    );
+  }
+
   @override
   State<EditDeviceDialog> createState() => _EditDeviceDialogState();
 }
 
 class _EditDeviceDialogState extends State<EditDeviceDialog> {
+  late final TextEditingController _macCtrl;
   late final TextEditingController _nameCtrl;
   late final TextEditingController _vendorCtrl;
   late final TextEditingController _notesCtrl;
   String _selectedCategoryKey = 'other';
+  String? _macError;
 
   @override
   void initState() {
     super.initState();
+    _macCtrl = TextEditingController(text: widget.macAddress);
     _nameCtrl = TextEditingController(text: widget.initialName ?? '');
     _vendorCtrl = TextEditingController(text: widget.initialVendor ?? '');
     _notesCtrl = TextEditingController(text: widget.initialNotes ?? '');
@@ -46,15 +82,37 @@ class _EditDeviceDialogState extends State<EditDeviceDialog> {
 
   @override
   void dispose() {
+    _macCtrl.dispose();
     _nameCtrl.dispose();
     _vendorCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
   }
 
+  void _onMacChanged(String raw) {
+    if (widget.macAddress.isNotEmpty) return;
+    final clean = raw.trim();
+    if (clean.isEmpty) {
+      setState(() => _macError = null);
+      return;
+    }
+    if (SharedDevice.isValidMac(clean)) {
+      final vendor = OuiLookupService.lookupVendor(clean);
+      setState(() {
+        _macError = null;
+        if (_vendorCtrl.text.isEmpty && vendor != 'Unknown OUI' && !vendor.startsWith('Unknown OUI')) {
+          _vendorCtrl.text = vendor;
+        }
+      });
+    } else {
+      setState(() => _macError = 'Enter a valid 12-digit hex MAC address');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentCat = DeviceCategory.fromKey(_selectedCategoryKey);
+    final isNewDevice = widget.macAddress.isEmpty;
 
     return Dialog(
       backgroundColor: const Color(0xFF1E1E1E),
@@ -76,10 +134,10 @@ class _EditDeviceDialogState extends State<EditDeviceDialog> {
                     child: Icon(currentCat.icon, size: 16, color: Colors.black),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Edit Device in Shared Library',
-                      style: TextStyle(
+                      isNewDevice ? 'Add Device to Shared Library' : 'Edit Device in Shared Library',
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -94,37 +152,63 @@ class _EditDeviceDialogState extends State<EditDeviceDialog> {
               ),
               const SizedBox(height: 16),
 
-              // MAC Address (read-only)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF252526),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF3E3E42)),
+              // MAC Address Field
+              if (isNewDevice) ...[
+                TextField(
+                  controller: _macCtrl,
+                  autofocus: true,
+                  onChanged: _onMacChanged,
+                  style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                  decoration: InputDecoration(
+                    labelText: 'MAC Address *',
+                    hintText: 'e.g. 00:1A:2B:3C:4D:5E',
+                    prefixIcon: const Icon(Icons.memory, size: 18),
+                    border: const OutlineInputBorder(),
+                    errorText: _macError,
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.memory, size: 16, color: Colors.grey),
-                    const SizedBox(width: 8),
-                    const Text('MAC: ', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    Text(
-                      widget.macAddress,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white70,
+                const SizedBox(height: 14),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF252526),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF3E3E42)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.memory, size: 16, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      const Text('MAC: ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text(
+                        widget.macAddress,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white70,
+                        ),
                       ),
-                    ),
-                  ],
+                      if (widget.initialIp != null && widget.initialIp!.isNotEmpty) ...[
+                        const Spacer(),
+                        const Icon(Icons.lan, size: 14, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text(
+                          widget.initialIp!,
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
+              ],
 
               // Device Friendly Name
               TextField(
                 controller: _nameCtrl,
-                autofocus: true,
+                autofocus: !isNewDevice,
                 style: const TextStyle(fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: 'Friendly Device Name *',
@@ -208,11 +292,17 @@ class _EditDeviceDialogState extends State<EditDeviceDialog> {
                       foregroundColor: Colors.black,
                     ),
                     onPressed: () {
+                      final targetMac = isNewDevice ? _macCtrl.text.trim() : widget.macAddress;
+                      if (!SharedDevice.isValidMac(targetMac)) {
+                        setState(() => _macError = 'Enter a valid 12-digit hex MAC address');
+                        return;
+                      }
+
                       final name = _nameCtrl.text.trim();
                       if (name.isEmpty) return;
 
                       widget.onSave(
-                        mac: widget.macAddress,
+                        mac: SharedDevice.normalizeMac(targetMac),
                         name: name,
                         category: _selectedCategoryKey,
                         vendor: _vendorCtrl.text.trim().isNotEmpty

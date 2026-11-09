@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../domain/models/network_adapter_info.dart';
 import '../view_models/arp_scout_view_model.dart';
+import 'dialogs/device_library_dialog.dart';
 
 class ArpControlBar extends StatefulWidget {
   const ArpControlBar({super.key});
@@ -414,36 +415,22 @@ class _ArpControlBarState extends State<ArpControlBar> {
                 ),
                 const SizedBox(width: 6),
 
-                // Simulate Conflict Button (for testing L2 conflict detection)
-                Tooltip(
-                  message:
-                      'Inject a simulated Gratuitous ARP MAC collision on an existing IP',
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      vm.simulateRogueMacConflict();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Simulated Gratuitous ARP conflict injected — check IP CONFLICT alerts.',
-                          ),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    icon: const Icon(
-                      Icons.warning_amber_rounded,
-                      size: 15,
-                      color: Color(0xFFF59E0B),
-                    ),
-                    label: const Text(
-                      'Test Conflict',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
+                // Custom Library Button (Matching Route Tracer & Syslog Server)
+                OutlinedButton.icon(
+                  onPressed: () => DeviceLibraryDialog.show(context),
+                  icon: const Icon(
+                    Icons.menu_book,
+                    size: 15,
+                    color: Color(0xFF60A5FA),
+                  ),
+                  label: const Text(
+                    'Custom Library',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
                     ),
                   ),
                 ),

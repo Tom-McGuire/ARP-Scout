@@ -11,6 +11,7 @@ import '../../../../domain/models/arp_host_record.dart';
 import '../../../../domain/models/host_status.dart';
 import '../../../../domain/models/network_adapter_info.dart';
 import '../../../../domain/models/scan_progress.dart';
+import '../../../../domain/models/unknown_device_entry.dart';
 
 class ArpScoutViewModel extends ChangeNotifier {
   ArpScoutViewModel({
@@ -51,7 +52,7 @@ class ArpScoutViewModel extends ChangeNotifier {
 
   bool _showAutoDetected = false;
   Set<String> _hiddenDeviceMacs = {};
-  List<SharedDevice> _sharedDevices = [];
+  Set<String> _explicitlyShownMacs = {};
   Map<String, int> _deviceCounts = {};
 
   List<NetworkAdapterInfo> get adapters => _adapters;
@@ -76,26 +77,108 @@ class ArpScoutViewModel extends ChangeNotifier {
 
   bool get showAutoDetected => _showAutoDetected;
   Set<String> get hiddenDeviceMacs => _hiddenDeviceMacs;
+  Set<String> get explicitlyShownMacs => _explicitlyShownMacs;
+
+  /// Known devices from SharedDeviceDatabase that have been given a custom name
+  List<SharedDevice> get allKnownCustomDevices {
+    if (!SharedDeviceDatabase.instance.isInitialized) return const [];
+    try {
+      return SharedDeviceDatabase.instance
+          .getAllDevices(hideDefaultNamed: true);
+    } catch (_) {
+      return const [];
+    }
+  }
 
   /// Returns all labeled devices from SharedDeviceDatabase that are not hidden in ARP Scout.
   List<SharedDevice> get visibleSharedDevices {
-    return _sharedDevices
-        .where((d) => d.hasCustomName && !_hiddenDeviceMacs.contains(d.macAddress))
-        .toList();
+    if (!SharedDeviceDatabase.instance.isInitialized) return const [];
+    try {
+      final all = SharedDeviceDatabase.instance.getAllDevices(hideDefaultNamed: true);
+      return all.where((d) => !_hiddenDeviceMacs.contains(d.macAddress)).toList();
+    } catch (_) {
+      return const [];
+    }
   }
 
+  /// Returns all unknown/unnamed devices (devices in database without custom names,
+  /// plus active ARP table hosts without custom names).
+  List<UnknownDeviceEntry> get allUnknownDevices {
+    final knownMacs = allKnownCustomDevices.map((d) => d.macAddress).toSet();
+    final results = <UnknownDeviceEntry>[];
+    final seenKeys = <String>{};
+
+    // 1. Devices in SharedDeviceDatabase without custom names
+    if (SharedDeviceDatabase.instance.isInitialized) {
+      try {
+        final allDbDevices = SharedDeviceDatabase.instance.getAllDevices(hideDefaultNamed: false);
+        for (final dev in allDbDevices) {
+          if (!dev.hasCustomName) {
+            final key = dev.macAddress;
+            if (seenKeys.add(key)) {
+              final isShown = _showAutoDetected || _explicitlyShownMacs.contains(key);
+              results.add(UnknownDeviceEntry(
+                key: key,
+                macAddress: dev.macAddress,
+                displayName: dev.name.isNotEmpty ? dev.name : 'Device ${dev.macAddress}',
+                vendor: dev.vendor,
+                isInDatabase: true,
+                isHidden: !isShown,
+              ));
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Active ARP hosts without custom names
+    for (final host in _hosts) {
+      final normMac = SharedDevice.isValidMac(host.macAddress)
+          ? SharedDevice.normalizeMac(host.macAddress)
+          : host.macAddress.toUpperCase();
+      if (knownMacs.contains(normMac)) continue;
+
+      final key = normMac;
+      if (seenKeys.add(key)) {
+        final isShown = _showAutoDetected || _explicitlyShownMacs.contains(key);
+        final displayName = (host.hostname != null && host.hostname!.trim().isNotEmpty)
+            ? host.hostname!.trim()
+            : (host.customName?.isNotEmpty == true ? host.customName! : 'Device $normMac');
+        results.add(UnknownDeviceEntry(
+          key: key,
+          macAddress: normMac,
+          ip: host.ipAddress,
+          displayName: displayName,
+          vendor: host.vendor,
+          isInDatabase: false,
+          isHidden: !isShown,
+        ));
+      }
+    }
+
+    return results;
+  }
+
+  /// Unknown devices that are unhidden and shown as filter pills.
+  List<UnknownDeviceEntry> get visibleUnknownDevices =>
+      allUnknownDevices.where((d) => !d.isHidden).toList();
+
   /// Returns active auto-detected hosts currently in the ARP table that do not have
-  /// a custom labeled entry in visibleSharedDevices and are not hidden.
+  /// a custom labeled entry in visibleSharedDevices and are shown.
   List<ArpHostRecord> get autoDetectedUnlabeledHosts {
-    if (!_showAutoDetected) return const [];
     final labeledMacs = visibleSharedDevices.map((d) => d.macAddress).toSet();
     final seen = <String>{};
     final result = <ArpHostRecord>[];
     for (final host in _hosts) {
-      final mac = host.macAddress.toUpperCase();
-      if (!labeledMacs.contains(mac) &&
-          !_hiddenDeviceMacs.contains(mac) &&
-          seen.add(mac)) {
+      final mac = SharedDevice.isValidMac(host.macAddress)
+          ? SharedDevice.normalizeMac(host.macAddress)
+          : host.macAddress.toUpperCase();
+      if (labeledMacs.contains(mac)) continue;
+
+      final isShown = _showAutoDetected || _explicitlyShownMacs.contains(mac);
+      if (!isShown) continue;
+
+      if (seen.add(mac)) {
         result.add(host);
       }
     }
@@ -129,43 +212,92 @@ class ArpScoutViewModel extends ChangeNotifier {
       final prefs = await ArpScoutPreferencesService.loadPreferences();
       _showAutoDetected = prefs.showAutoDetected;
       _hiddenDeviceMacs = prefs.hiddenDeviceMacs;
+      _explicitlyShownMacs = prefs.explicitlyShownMacs;
+      if (prefs.selectedDeviceMacs.isNotEmpty) {
+        _filter = _filter.copyWith(selectedDeviceMacs: prefs.selectedDeviceMacs);
+      }
     } catch (_) {}
-    _refreshSharedDevices();
   }
 
-  void _refreshSharedDevices() {
-    _sharedDevices = _repository.getAllSharedDevices();
+  void _savePreferences() {
+    ArpScoutPreferencesService.savePreferences(
+      ArpScoutPreferences(
+        showAutoDetected: _showAutoDetected,
+        hiddenDeviceMacs: _hiddenDeviceMacs,
+        explicitlyShownMacs: _explicitlyShownMacs,
+        selectedDeviceMacs: _filter.selectedDeviceMacs,
+      ),
+    );
   }
 
   void setShowAutoDetected(bool value) {
     if (_showAutoDetected == value) return;
     _showAutoDetected = value;
-    ArpScoutPreferencesService.savePreferences(
-      ArpScoutPreferences(
-        showAutoDetected: _showAutoDetected,
-        hiddenDeviceMacs: _hiddenDeviceMacs,
-      ),
-    );
+    _savePreferences();
     notifyListeners();
   }
 
-  void toggleDeviceVisibility(String mac) {
-    final normalized = SharedDevice.normalizeMac(mac);
-    if (_hiddenDeviceMacs.contains(normalized)) {
-      _hiddenDeviceMacs = Set.from(_hiddenDeviceMacs)..remove(normalized);
+  void toggleDeviceVisibility(String key) {
+    final normalized = SharedDevice.isValidMac(key) ? SharedDevice.normalizeMac(key) : key;
+    final isKnown = allKnownCustomDevices.any((d) => d.macAddress == normalized);
+
+    if (!isKnown) {
+      final isShown = _showAutoDetected || _explicitlyShownMacs.contains(normalized);
+      if (isShown) {
+        _explicitlyShownMacs = Set.from(_explicitlyShownMacs)..remove(normalized);
+        if (_filter.selectedDeviceMacs.contains(normalized)) {
+          toggleDevicePill(normalized);
+        }
+      } else {
+        _explicitlyShownMacs = Set.from(_explicitlyShownMacs)..add(normalized);
+      }
     } else {
-      _hiddenDeviceMacs = Set.from(_hiddenDeviceMacs)..add(normalized);
-      if (_filter.selectedDeviceMacs.contains(normalized)) {
-        toggleDevicePill(normalized);
+      if (_hiddenDeviceMacs.contains(normalized)) {
+        _hiddenDeviceMacs = Set.from(_hiddenDeviceMacs)..remove(normalized);
+      } else {
+        _hiddenDeviceMacs = Set.from(_hiddenDeviceMacs)..add(normalized);
+        if (_filter.selectedDeviceMacs.contains(normalized)) {
+          toggleDevicePill(normalized);
+        }
       }
     }
-    ArpScoutPreferencesService.savePreferences(
-      ArpScoutPreferences(
-        showAutoDetected: _showAutoDetected,
-        hiddenDeviceMacs: _hiddenDeviceMacs,
-      ),
-    );
+    _savePreferences();
     notifyListeners();
+  }
+
+  void setDeviceHidden(String key, bool isHidden) {
+    final normalized = SharedDevice.isValidMac(key) ? SharedDevice.normalizeMac(key) : key;
+    final isKnown = allKnownCustomDevices.any((d) => d.macAddress == normalized);
+
+    if (!isKnown) {
+      if (isHidden) {
+        _explicitlyShownMacs = Set.from(_explicitlyShownMacs)..remove(normalized);
+        if (_filter.selectedDeviceMacs.contains(normalized)) {
+          toggleDevicePill(normalized);
+        }
+      } else {
+        _explicitlyShownMacs = Set.from(_explicitlyShownMacs)..add(normalized);
+      }
+    } else {
+      if (isHidden) {
+        _hiddenDeviceMacs = Set.from(_hiddenDeviceMacs)..add(normalized);
+        if (_filter.selectedDeviceMacs.contains(normalized)) {
+          toggleDevicePill(normalized);
+        }
+      } else {
+        _hiddenDeviceMacs = Set.from(_hiddenDeviceMacs)..remove(normalized);
+      }
+    }
+    _savePreferences();
+    notifyListeners();
+  }
+
+  void unhideAllDevices() {
+    _hiddenDeviceMacs = {};
+    _explicitlyShownMacs = {};
+    _showAutoDetected = true;
+    _savePreferences();
+    _refreshQuery();
   }
 
   void toggleDevicePill(String mac) {
@@ -177,12 +309,14 @@ class ArpScoutViewModel extends ChangeNotifier {
       current.add(normalized);
     }
     _filter = _filter.copyWith(selectedDeviceMacs: current);
+    _savePreferences();
     _refreshQuery();
   }
 
   void clearDeviceFilters() {
     if (_filter.selectedDeviceMacs.isEmpty) return;
     _filter = _filter.copyWith(selectedDeviceMacs: const {});
+    _savePreferences();
     _refreshQuery();
   }
 
@@ -200,7 +334,10 @@ class ArpScoutViewModel extends ChangeNotifier {
       vendor: vendor,
       notes: notes,
     );
-    _refreshSharedDevices();
+    final normalized = SharedDevice.normalizeMac(mac);
+    _hiddenDeviceMacs = Set.from(_hiddenDeviceMacs)..remove(normalized);
+    _explicitlyShownMacs = Set.from(_explicitlyShownMacs)..remove(normalized);
+    _savePreferences();
     _refreshQuery();
   }
 
@@ -660,7 +797,6 @@ class ArpScoutViewModel extends ChangeNotifier {
   Future<String?> exportJson() => _repository.exportJson(_filter);
 
   void _refreshQuery({bool notify = true}) {
-    _refreshSharedDevices();
     _totalHostCount = _repository.countHosts(_filter);
     _unfilteredTotalCount = _repository.totalUnfilteredCount();
     _statusCounts = _repository.getStatusCounts(_filter);

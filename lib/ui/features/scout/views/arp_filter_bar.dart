@@ -421,7 +421,7 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
                   );
                 }),
 
-                if (vm.showAutoDetected && autoDetected.isNotEmpty) ...[
+                if (autoDetected.isNotEmpty) ...[
                   if (visibleShared.isNotEmpty) ...[
                     const SizedBox(width: 4),
                     Container(
@@ -489,15 +489,7 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
                     backgroundColor: const Color(0xFF252526),
                     side: const BorderSide(color: Color(0xFF3E3E42), width: 1),
                     tooltip: 'Manage device library and visibility in ARP Scout',
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => ChangeNotifierProvider.value(
-                          value: vm,
-                          child: const DeviceLibraryDialog(),
-                        ),
-                      );
-                    },
+                    onPressed: () => DeviceLibraryDialog.show(context),
                   ),
                 ),
               ],

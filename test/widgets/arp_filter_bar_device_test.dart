@@ -112,7 +112,7 @@ void main() {
 
       // Verify DeviceLibraryDialog opens
       expect(find.byType(DeviceLibraryDialog), findsOneWidget);
-      expect(find.textContaining('Device Library'), findsOneWidget);
+      expect(find.text('Custom Library'), findsOneWidget);
       expect(find.text('Core Switch'), findsOneWidget);
     });
 

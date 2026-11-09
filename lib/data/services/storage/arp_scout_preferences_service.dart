@@ -7,38 +7,70 @@ class ArpScoutPreferences {
   const ArpScoutPreferences({
     this.showAutoDetected = false,
     this.hiddenDeviceMacs = const {},
+    this.explicitlyShownMacs = const {},
+    this.selectedDeviceMacs = const {},
   });
 
   final bool showAutoDetected;
   final Set<String> hiddenDeviceMacs;
+  final Set<String> explicitlyShownMacs;
+  final Set<String> selectedDeviceMacs;
 
   ArpScoutPreferences copyWith({
     bool? showAutoDetected,
     Set<String>? hiddenDeviceMacs,
+    Set<String>? explicitlyShownMacs,
+    Set<String>? selectedDeviceMacs,
   }) {
     return ArpScoutPreferences(
       showAutoDetected: showAutoDetected ?? this.showAutoDetected,
       hiddenDeviceMacs: hiddenDeviceMacs ?? this.hiddenDeviceMacs,
+      explicitlyShownMacs: explicitlyShownMacs ?? this.explicitlyShownMacs,
+      selectedDeviceMacs: selectedDeviceMacs ?? this.selectedDeviceMacs,
     );
   }
 
   Map<String, dynamic> toJson() => {
         'showAutoDetected': showAutoDetected,
         'hiddenDeviceMacs': hiddenDeviceMacs.toList(),
+        'explicitlyShownMacs': explicitlyShownMacs.toList(),
+        'selectedDeviceMacs': selectedDeviceMacs.toList(),
       };
 
   factory ArpScoutPreferences.fromJson(Map<String, dynamic> json) {
-    final showAuto = json['showAutoDetected'] as bool? ?? false;
+    final showAuto = json['showAutoDetected'] is bool
+        ? json['showAutoDetected'] as bool
+        : false;
+
     final hiddenList = json['hiddenDeviceMacs'] as List<dynamic>?;
     final hiddenSet = hiddenList != null
         ? hiddenList
             .whereType<String>()
-            .map((m) => SharedDevice.normalizeMac(m))
+            .map((m) => SharedDevice.isValidMac(m) ? SharedDevice.normalizeMac(m) : m)
             .toSet()
         : <String>{};
+
+    final shownList = json['explicitlyShownMacs'] as List<dynamic>?;
+    final shownSet = shownList != null
+        ? shownList
+            .whereType<String>()
+            .map((m) => SharedDevice.isValidMac(m) ? SharedDevice.normalizeMac(m) : m)
+            .toSet()
+        : <String>{};
+
+    final selectedList = json['selectedDeviceMacs'] as List<dynamic>?;
+    final selectedSet = selectedList != null
+        ? selectedList
+            .whereType<String>()
+            .map((m) => SharedDevice.isValidMac(m) ? SharedDevice.normalizeMac(m) : m)
+            .toSet()
+        : <String>{};
+
     return ArpScoutPreferences(
       showAutoDetected: showAuto,
       hiddenDeviceMacs: hiddenSet,
+      explicitlyShownMacs: shownSet,
+      selectedDeviceMacs: selectedSet,
     );
   }
 }

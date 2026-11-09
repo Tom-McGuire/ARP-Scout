@@ -93,13 +93,29 @@ void main() {
       expect(dev!.name, equals('New Production Switch'));
     });
 
+    test('loadDemoTopology does not insert records into SharedDeviceDatabase', () {
+      final initialCount = SharedDeviceDatabase.instance.getAllDevices().length;
+      repository.loadDemoTopology();
+      final afterCount = SharedDeviceDatabase.instance.getAllDevices().length;
+      expect(afterCount, equals(initialCount));
+    });
+
     test('syncAllSharedDeviceNamesToLocalDb updates local database records from shared DB', () {
       repository.loadDemoTopology();
       final hosts = repository.queryHosts(filter: const ArpFilterCriteria());
       expect(hosts.isNotEmpty, isTrue);
 
       final targetHost = hosts.first;
-      SharedDeviceDatabase.instance.updateDeviceName(targetHost.macAddress, 'Synchronized Switch');
+      // Pre-seed the shared database with a custom name for this device
+      SharedDeviceDatabase.instance.upsertDevice(
+        SharedDevice(
+          macAddress: targetHost.macAddress,
+          name: 'Synchronized Switch',
+          sourceApp: 'test',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
 
       repository.syncAllSharedDeviceNamesToLocalDb();
 
