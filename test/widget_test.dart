@@ -346,7 +346,7 @@ IP Address,MAC Address,Vendor,Hostname,Device Name,Status
       await tester.pumpWidget(const ArpScoutApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('ARP & Subnet Scout'), findsOneWidget);
+      expect(find.text('ARP & SUBNET SCOUT'), findsOneWidget);
       expect(find.text('No ARP or Subnet Discovery Data Loaded'), findsOneWidget);
 
       // Click Load Demo Subnet button in the empty state
