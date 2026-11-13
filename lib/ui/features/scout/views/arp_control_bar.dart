@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
 import '../../../../domain/models/network_adapter_info.dart';
 import '../view_models/arp_scout_view_model.dart';
 import 'dialogs/device_library_dialog.dart';
@@ -83,7 +84,10 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                   ),
                                   Text(
                                     'L2/L3 Discovery • OUI Lookup • Conflict Detector',
-                                    style: TextStyle(fontSize: 10, color: Colors.white54),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white54,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -93,20 +97,31 @@ class _ArpControlBarState extends State<ArpControlBar> {
                               // Network Interface Selector
                               Container(
                                 height: 32,
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF252526),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFF3E3E42)),
+                                  border: Border.all(
+                                    color: const Color(0xFF3E3E42),
+                                  ),
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<NetworkAdapterInfo>(
-                                    value: vm.adapters.contains(vm.selectedAdapter)
+                                    value:
+                                        vm.adapters.contains(vm.selectedAdapter)
                                         ? vm.selectedAdapter
                                         : vm.adapters.first,
                                     isDense: true,
-                                    icon: const Icon(Icons.arrow_drop_down, size: 18),
-                                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                                    icon: const Icon(
+                                      Icons.arrow_drop_down,
+                                      size: 18,
+                                    ),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white,
+                                    ),
                                     dropdownColor: const Color(0xFF252526),
                                     onChanged: isScanning
                                         ? null
@@ -119,13 +134,17 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                       IconData icon = Icons.lan_outlined;
                                       if (adapter.isAllInterfaces) {
                                         icon = Icons.public;
-                                      } else if (adapter.name.toLowerCase().contains(
-                                            'wi-fi',
-                                          ) ||
-                                          adapter.name.toLowerCase().contains('wlan')) {
+                                      } else if (adapter.name
+                                              .toLowerCase()
+                                              .contains('wi-fi') ||
+                                          adapter.name.toLowerCase().contains(
+                                            'wlan',
+                                          )) {
                                         icon = Icons.wifi;
                                       }
-                                      return DropdownMenuItem<NetworkAdapterInfo>(
+                                      return DropdownMenuItem<
+                                        NetworkAdapterInfo
+                                      >(
                                         value: adapter,
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
@@ -133,7 +152,9 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                             Icon(
                                               icon,
                                               size: 14,
-                                              color: Theme.of(context).colorScheme.primary,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
                                             ),
                                             const SizedBox(width: 6),
                                             Text(adapter.displayName),
@@ -153,7 +174,9 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                   minWidth: 26,
                                   minHeight: 26,
                                 ),
-                                onPressed: isScanning ? null : () => vm.refreshAdapters(),
+                                onPressed: isScanning
+                                    ? null
+                                    : () => vm.refreshAdapters(),
                               ),
                               const SizedBox(width: 10),
 
@@ -161,7 +184,8 @@ class _ArpControlBarState extends State<ArpControlBar> {
                               Builder(
                                 builder: (context) {
                                   final currentSubnet = progress.targetSubnet;
-                                  final base = vm.selectedAdapter.isAllInterfaces
+                                  final base =
+                                      vm.selectedAdapter.isAllInterfaces
                                       ? '192.168.1'
                                       : vm.selectedAdapter.ipAddress
                                             .split('.')
@@ -179,17 +203,24 @@ class _ArpControlBarState extends State<ArpControlBar> {
 
                                   return Container(
                                     height: 32,
-                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF252526),
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFF3E3E42)),
+                                      border: Border.all(
+                                        color: const Color(0xFF3E3E42),
+                                      ),
                                     ),
                                     child: DropdownButtonHideUnderline(
                                       child: DropdownButton<String>(
                                         value: currentSubnet,
                                         isDense: true,
-                                        icon: const Icon(Icons.arrow_drop_down, size: 18),
+                                        icon: const Icon(
+                                          Icons.arrow_drop_down,
+                                          size: 18,
+                                        ),
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: Colors.white,
@@ -199,7 +230,10 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                             ? null
                                             : (val) {
                                                 if (val == '__custom__') {
-                                                  _showCustomSubnetDialog(context, vm);
+                                                  _showCustomSubnetDialog(
+                                                    context,
+                                                    vm,
+                                                  );
                                                 } else if (val != null) {
                                                   vm.updateTargetSubnet(val);
                                                 }
@@ -214,8 +248,9 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                                   Icon(
                                                     Icons.hub_outlined,
                                                     size: 14,
-                                                    color:
-                                                        Theme.of(context).colorScheme.primary,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .primary,
                                                   ),
                                                   const SizedBox(width: 6),
                                                   Text(
@@ -266,7 +301,8 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                 ),
                                 onPressed: isScanning
                                     ? null
-                                    : () => _showCustomSubnetDialog(context, vm),
+                                    : () =>
+                                          _showCustomSubnetDialog(context, vm),
                               ),
                               const SizedBox(width: 12),
 
@@ -311,7 +347,9 @@ class _ArpControlBarState extends State<ArpControlBar> {
                               FilledButton.tonalIcon(
                                 onPressed: isScanning
                                     ? null
-                                    : () => vm.startSubnetScan(arpCacheOnly: true),
+                                    : () => vm.startSubnetScan(
+                                        arpCacheOnly: true,
+                                      ),
                                 icon: const Icon(Icons.bolt, size: 16),
                                 label: const Text(
                                   'Read ARP Cache',
@@ -333,9 +371,13 @@ class _ArpControlBarState extends State<ArpControlBar> {
                               OutlinedButton.icon(
                                 onPressed: () => vm.toggleContinuousWatch(),
                                 icon: Icon(
-                                  isWatching ? Icons.visibility : Icons.visibility_outlined,
+                                  isWatching
+                                      ? Icons.visibility
+                                      : Icons.visibility_outlined,
                                   size: 15,
-                                  color: isWatching ? const Color(0xFF10B981) : Colors.grey,
+                                  color: isWatching
+                                      ? const Color(0xFF10B981)
+                                      : Colors.grey,
                                 ),
                                 label: Text(
                                   isWatching ? 'Watching (15s)' : 'Watch Mode',
@@ -364,6 +406,37 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                   ),
                                 ),
                               ),
+                              if (vm.isL2RoleListening) ...[
+                                const SizedBox(width: 10),
+                                Tooltip(
+                                  message: vm.isListeningForIgmp
+                                      ? 'Passively listening for STP BPDUs / IGMP General Queries (up to ~2 min)'
+                                      : 'Capturing STP BPDUs…',
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF14B8A6),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        vm.isListeningForIgmp
+                                            ? 'Listening: IGMP querier'
+                                            : 'Listening: STP',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF14B8A6),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
 
@@ -380,14 +453,16 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primaryContainer.withValues(alpha: 0.35),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer
+                                        .withValues(alpha: 0.35),
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary.withValues(alpha: 0.6),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.6),
                                     ),
                                   ),
                                   child: Row(
@@ -396,11 +471,15 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                       Icon(
                                         Icons.insert_drive_file_outlined,
                                         size: 13,
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
                                       ),
                                       const SizedBox(width: 5),
                                       ConstrainedBox(
-                                        constraints: const BoxConstraints(maxWidth: 130),
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 130,
+                                        ),
                                         child: Text(
                                           vm.loadedFileName!,
                                           style: const TextStyle(
@@ -430,8 +509,14 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                 onPressed: vm.isImporting
                                     ? null
                                     : () => _handleImportCsv(context, vm),
-                                icon: const Icon(Icons.file_open_outlined, size: 15),
-                                label: const Text('Open CSV', style: TextStyle(fontSize: 11)),
+                                icon: const Icon(
+                                  Icons.file_open_outlined,
+                                  size: 15,
+                                ),
+                                label: const Text(
+                                  'Open CSV',
+                                  style: TextStyle(fontSize: 11),
+                                ),
                                 style: FilledButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
@@ -446,11 +531,9 @@ class _ArpControlBarState extends State<ArpControlBar> {
 
                               // Device Library Button (Icons.devices)
                               OutlinedButton.icon(
-                                onPressed: () => DeviceLibraryDialog.show(context),
-                                icon: const Icon(
-                                  Icons.devices,
-                                  size: 15,
-                                ),
+                                onPressed: () =>
+                                    DeviceLibraryDialog.show(context),
+                                icon: const Icon(Icons.devices, size: 15),
                                 label: const Text(
                                   'Device Library',
                                   style: TextStyle(fontSize: 11),
@@ -469,8 +552,13 @@ class _ArpControlBarState extends State<ArpControlBar> {
 
                               // Load Demo Button (Icons.play_circle_outline)
                               OutlinedButton.icon(
-                                onPressed: isScanning ? null : () => vm.loadDemoTopology(),
-                                icon: const Icon(Icons.play_circle_outline, size: 15),
+                                onPressed: isScanning
+                                    ? null
+                                    : () => vm.loadDemoTopology(),
+                                icon: const Icon(
+                                  Icons.play_circle_outline,
+                                  size: 15,
+                                ),
                                 label: const Text(
                                   'Load Demo',
                                   style: TextStyle(fontSize: 11),
@@ -490,11 +578,18 @@ class _ArpControlBarState extends State<ArpControlBar> {
                               // ==================== ZONE 5: CLEAR & EXPORT ====================
                               // Clear Button
                               OutlinedButton.icon(
-                                onPressed: vm.unfilteredTotalCount == 0 || isScanning
+                                onPressed:
+                                    vm.unfilteredTotalCount == 0 || isScanning
                                     ? null
                                     : () => _confirmClear(context, vm),
-                                icon: const Icon(Icons.delete_sweep_outlined, size: 15),
-                                label: const Text('Clear', style: TextStyle(fontSize: 11)),
+                                icon: const Icon(
+                                  Icons.delete_sweep_outlined,
+                                  size: 15,
+                                ),
+                                label: const Text(
+                                  'Clear',
+                                  style: TextStyle(fontSize: 11),
+                                ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.red.shade300,
                                   padding: const EdgeInsets.symmetric(
@@ -516,16 +611,26 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                   if (val == 'csv') {
                                     final path = await vm.exportCsv();
                                     if (path != null && context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Exported CSV to: $path')),
-                                      );
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Exported CSV to: $path',
+                                              ),
+                                            ),
+                                          );
                                     }
                                   } else if (val == 'json') {
                                     final path = await vm.exportJson();
                                     if (path != null && context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Exported JSON to: $path')),
-                                      );
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Exported JSON to: $path',
+                                              ),
+                                            ),
+                                          );
                                     }
                                   }
                                 },
@@ -552,18 +657,37 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                   ),
                                 ],
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 7,
+                                  ),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFF3E3E42)),
+                                    border: Border.all(
+                                      color: const Color(0xFF3E3E42),
+                                    ),
                                   ),
                                   child: const Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.download, size: 15, color: Colors.white70),
+                                      Icon(
+                                        Icons.download,
+                                        size: 15,
+                                        color: Colors.white70,
+                                      ),
                                       SizedBox(width: 6),
-                                      Text('Export', style: TextStyle(fontSize: 11, color: Colors.white70)),
-                                      Icon(Icons.arrow_drop_down, size: 14, color: Colors.white70),
+                                      Text(
+                                        'Export',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.arrow_drop_down,
+                                        size: 14,
+                                        color: Colors.white70,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -830,7 +954,9 @@ class _ArpControlBarState extends State<ArpControlBar> {
     BuildContext context,
     ArpScoutViewModel vm,
   ) async {
-    final controller = TextEditingController(text: vm.scanProgress.targetSubnet);
+    final controller = TextEditingController(
+      text: vm.scanProgress.targetSubnet,
+    );
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(

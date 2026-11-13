@@ -1,13 +1,16 @@
 import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
 import '../../../../data/services/ipc/inter_app_launcher.dart';
 import '../../../../data/services/oui/oui_lookup_service.dart';
 import '../../../../domain/models/arp_host_record.dart';
 import '../view_models/arp_scout_view_model.dart';
+import 'l2_role_pills.dart';
 
 class ArpDetailPanel extends StatefulWidget {
   const ArpDetailPanel({super.key});
@@ -100,13 +103,19 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                   ),
                 ),
                 const SizedBox(width: 10),
-                if (record.customName != null && record.customName!.isNotEmpty) ...[
+                if (record.customName != null &&
+                    record.customName!.isNotEmpty) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1.5,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
+                      ),
                     ),
                     child: Text(
                       record.customName!,
@@ -177,7 +186,11 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                 // Trace Path in Net Route Scout Button
                 IconButton(
                   tooltip: 'Trace Path to Host in Net Route Scout',
-                  icon: const Icon(Icons.alt_route, size: 16, color: Color(0xFF38BDF8)),
+                  icon: const Icon(
+                    Icons.alt_route,
+                    size: 16,
+                    color: Color(0xFF38BDF8),
+                  ),
                   constraints: const BoxConstraints(
                     minWidth: 28,
                     minHeight: 28,
@@ -227,6 +240,41 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (record.isStpRootBridge || record.isIgmpQuerier) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'NETWORK INFRASTRUCTURE ROLES',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  if (record.isStpRootBridge)
+                    Text(
+                      '👑 STP Root Bridge — priority ${record.stpRootPriority ?? 'unknown'}',
+                      style: const TextStyle(fontSize: 12, color: stpRootColor),
+                    ),
+                  if (record.isIgmpQuerier)
+                    Text(
+                      '📡 Active IGMP Querier — ${record.igmpQuerierVersion ?? 'version unknown'}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: igmpQuerierColor,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
           // If an IP conflict exists on this IP, show a prominent Conflict Breakdown Box
           if (record.hasConflict) ...[
             Container(
@@ -637,8 +685,12 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                   value,
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: record.customName != null ? FontWeight.bold : FontWeight.w500,
-                    color: record.customName != null ? const Color(0xFF38BDF8) : Colors.white,
+                    fontWeight: record.customName != null
+                        ? FontWeight.bold
+                        : FontWeight.w500,
+                    color: record.customName != null
+                        ? const Color(0xFF38BDF8)
+                        : Colors.white,
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -834,7 +886,10 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                   const SizedBox(height: 6),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF141414),
                       borderRadius: BorderRadius.circular(4),

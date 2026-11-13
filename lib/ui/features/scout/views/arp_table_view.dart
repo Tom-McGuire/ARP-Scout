@@ -1,13 +1,16 @@
 import 'dart:io';
 import 'dart:math';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
 import '../../../../data/services/ipc/inter_app_launcher.dart';
 import '../../../../domain/models/arp_host_record.dart';
 import '../../../../domain/models/host_status.dart';
+import 'l2_role_pills.dart';
 import '../view_models/arp_scout_view_model.dart';
 
 enum ArpTableColumn {
@@ -246,9 +249,8 @@ class _ArpTableViewState extends State<ArpTableView> {
   ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      color: Theme.of(
-        context,
-      ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest
+          .withValues(alpha: 0.85),
       child: Row(
         children: ArpTableColumn.values.map((col) {
           return _buildHeaderCell(context, vm, col, widths[col]!);
@@ -345,9 +347,8 @@ class _ArpTableViewState extends State<ArpTableView> {
 
     Color rowBackground = Colors.transparent;
     if (isSelected) {
-      rowBackground = Theme.of(
-        context,
-      ).colorScheme.primary.withValues(alpha: 0.15);
+      rowBackground = Theme.of(context).colorScheme.primary
+          .withValues(alpha: 0.15);
     } else if (record.hasConflict) {
       rowBackground = const Color(0xFFEF4444).withValues(alpha: 0.08);
     } else if (record.associatedIps.length > 1) {
@@ -434,10 +435,17 @@ class _ArpTableViewState extends State<ArpTableView> {
             // 4. OUI Hardware Vendor
             SizedBox(
               width: widths[ArpTableColumn.vendor],
-              child: Text(
-                record.vendor,
-                style: const TextStyle(fontSize: 12),
-                overflow: TextOverflow.ellipsis,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      record.vendor,
+                      style: const TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  L2RolePills(record: record),
+                ],
               ),
             ),
 
@@ -460,8 +468,8 @@ class _ArpTableViewState extends State<ArpTableView> {
                           color: record.customName != null
                               ? const Color(0xFF38BDF8)
                               : (record.hostname != null
-                                  ? Colors.white
-                                  : Colors.grey),
+                                    ? Colors.white
+                                    : Colors.grey),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -553,7 +561,8 @@ class _ArpTableViewState extends State<ArpTableView> {
                     ),
                   ),
                   Tooltip(
-                    message: 'Trace Route in Net Route Scout (${record.ipAddress})',
+                    message:
+                        'Trace Route in Net Route Scout (${record.ipAddress})',
                     child: InkWell(
                       onTap: () => _launchRouteTrace(context, vm, record),
                       borderRadius: BorderRadius.circular(4),
@@ -654,9 +663,8 @@ class _ArpTableViewState extends State<ArpTableView> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      color: Theme.of(
-        context,
-      ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest
+          .withValues(alpha: 0.5),
       child: Row(
         children: [
           Icon(
@@ -1100,7 +1108,10 @@ class _ArpTableViewState extends State<ArpTableView> {
                   const SizedBox(height: 6),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF141414),
                       borderRadius: BorderRadius.circular(4),

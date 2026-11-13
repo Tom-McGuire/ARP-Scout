@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'host_status.dart';
 
 class ArpHostRecord {
@@ -25,6 +26,10 @@ class ArpHostRecord {
     this.associatedIps = const [],
     this.notes = '',
     this.rawArpLine = '',
+    this.isStpRootBridge = false,
+    this.stpRootPriority,
+    this.isIgmpQuerier = false,
+    this.igmpQuerierVersion,
   });
 
   final int? id;
@@ -48,6 +53,12 @@ class ArpHostRecord {
   final List<String> associatedIps;
   final String notes;
   final String rawArpLine;
+
+  /// Passively detected L2 roles (transient; not persisted to SQLite).
+  final bool isStpRootBridge;
+  final int? stpRootPriority;
+  final bool isIgmpQuerier;
+  final String? igmpQuerierVersion; // "IGMPv2" / "IGMPv3"
 
   DateTime get firstSeen => DateTime.fromMillisecondsSinceEpoch(firstSeenMs);
   DateTime get lastSeen => DateTime.fromMillisecondsSinceEpoch(lastSeenMs);
@@ -77,10 +88,10 @@ class ArpHostRecord {
 
   /// Normalizes any MAC string into uppercase colon-separated format (AA:BB:CC:DD:EE:FF).
   static String normalizeMac(String raw) {
-    final cleaned = raw
-        .trim()
-        .toUpperCase()
-        .replaceAll(RegExp(r'[^0-9A-F]'), '');
+    final cleaned = raw.trim().toUpperCase().replaceAll(
+      RegExp(r'[^0-9A-F]'),
+      '',
+    );
     if (cleaned.length != 12) {
       return raw.trim().toUpperCase();
     }
@@ -202,6 +213,10 @@ class ArpHostRecord {
     List<String>? associatedIps,
     String? notes,
     String? rawArpLine,
+    bool? isStpRootBridge,
+    int? stpRootPriority,
+    bool? isIgmpQuerier,
+    String? igmpQuerierVersion,
   }) {
     return ArpHostRecord(
       id: id ?? this.id,
@@ -225,6 +240,10 @@ class ArpHostRecord {
       associatedIps: associatedIps ?? this.associatedIps,
       notes: notes ?? this.notes,
       rawArpLine: rawArpLine ?? this.rawArpLine,
+      isStpRootBridge: isStpRootBridge ?? this.isStpRootBridge,
+      stpRootPriority: stpRootPriority ?? this.stpRootPriority,
+      isIgmpQuerier: isIgmpQuerier ?? this.isIgmpQuerier,
+      igmpQuerierVersion: igmpQuerierVersion ?? this.igmpQuerierVersion,
     );
   }
 

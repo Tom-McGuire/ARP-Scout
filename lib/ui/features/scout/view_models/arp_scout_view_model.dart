@@ -1,9 +1,12 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:network_suite_shared/network_suite_shared.dart';
+
 import '../../../../data/repositories/arp_repository.dart';
 import '../../../../data/services/import/csv_import_service.dart';
 import '../../../../data/services/oui/oui_lookup_service.dart';
+import '../../../../data/services/scanner/l2_role_sniffer_service.dart';
 import '../../../../data/services/scanner/subnet_scanner_service.dart';
 import '../../../../data/services/storage/arp_scout_preferences_service.dart';
 import '../../../../domain/models/arp_filter.dart';
@@ -20,12 +23,18 @@ class ArpScoutViewModel extends ChangeNotifier {
     this.initialAdapterIp,
     this.initialAdapterName,
     bool autoStart = false,
-  })  : initialAutoStart = autoStart,
-        _repository = repository ?? ArpRepository() {
+    L2RoleSnifferService? roleSniffer,
+  }) : initialAutoStart = autoStart,
+       _roleSniffer = roleSniffer ?? L2RoleSnifferService(),
+       _repository = repository ?? ArpRepository() {
     _init();
   }
 
   final ArpRepository _repository;
+  final L2RoleSnifferService _roleSniffer;
+  L2RoleSniffResult _roles = L2RoleSniffResult.empty;
+  bool _sniffingStp = false;
+  bool _listeningIgmp = false;
   final String? initialSubnet;
   final String? initialAdapterIp;
   final String? initialAdapterName;
@@ -56,6 +65,69 @@ class ArpScoutViewModel extends ChangeNotifier {
   Map<String, int> _deviceCounts = {};
 
   List<NetworkAdapterInfo> get adapters => _adapters;
+
+  /// True while a passive STP capture or long IGMP querier listen is running.
+  bool get isL2RoleListening => _sniffingStp || _listeningIgmp;
+  bool get isListeningForIgmp => _listeningIgmp;
+
+  void _startIgmpListener() {
+    if (_listeningIgmp || _selectedAdapter.isAllInterfaces) return;
+    _listeningIgmp = true;
+    notifyListeners();
+    final adapterName = _selectedAdapter.name;
+    _roleSniffer.listenForIgmpQuerier(interfaceName: adapterName).then((r) {
+      _listeningIgmp = false;
+      if (r.igmpQuerierIp != null && _selectedAdapter.name == adapterName) {
+        _roles = L2RoleSniffResult(
+          stpRootMac: _roles.stpRootMac,
+          stpRootPriority: _roles.stpRootPriority,
+          igmpQuerierIp: r.igmpQuerierIp,
+          igmpQuerierVersion: r.igmpQuerierVersion,
+        );
+        _refreshQuery();
+      } else {
+        notifyListeners();
+      }
+    });
+  }
+
+  /// True when STP Root and IGMP Querier were detected on different hosts.
+  bool get l2RolesMisaligned => _roles.rolesOnDifferentHosts(_hosts);
+
+  Future<L2RoleSniffResult> _trackedStpSniff(String name) async {
+    _sniffingStp = true;
+    notifyListeners();
+    try {
+      return await _roleSniffer.sniff(interfaceName: name);
+    } finally {
+      _sniffingStp = false;
+    }
+  }
+
+  List<ArpHostRecord> _applyRoles(List<ArpHostRecord> hosts) {
+    if (_roles.isEmpty) return hosts;
+    final rootMac = _roles.stpRootMac == null
+        ? null
+        : ArpHostRecord.normalizeMac(_roles.stpRootMac!);
+    return [
+      for (final h in hosts)
+        h.copyWith(
+          isStpRootBridge:
+              rootMac != null &&
+              ArpHostRecord.normalizeMac(h.macAddress) == rootMac,
+          stpRootPriority:
+              (rootMac != null &&
+                  ArpHostRecord.normalizeMac(h.macAddress) == rootMac)
+              ? _roles.stpRootPriority
+              : null,
+          isIgmpQuerier: h.ipAddress == _roles.igmpQuerierIp,
+          igmpQuerierVersion: h.ipAddress == _roles.igmpQuerierIp
+              ? _roles.igmpQuerierVersion
+              : null,
+        ),
+    ];
+  }
+
   NetworkAdapterInfo get selectedAdapter => _selectedAdapter;
   ArpFilterCriteria get filter => _filter;
   ScanProgress get scanProgress => _scanProgress;
@@ -83,8 +155,9 @@ class ArpScoutViewModel extends ChangeNotifier {
   List<SharedDevice> get allKnownCustomDevices {
     if (!SharedDeviceDatabase.instance.isInitialized) return const [];
     try {
-      return SharedDeviceDatabase.instance
-          .getAllDevices(hideDefaultNamed: true);
+      return SharedDeviceDatabase.instance.getAllDevices(
+        hideDefaultNamed: true,
+      );
     } catch (_) {
       return const [];
     }
@@ -94,8 +167,12 @@ class ArpScoutViewModel extends ChangeNotifier {
   List<SharedDevice> get visibleSharedDevices {
     if (!SharedDeviceDatabase.instance.isInitialized) return const [];
     try {
-      final all = SharedDeviceDatabase.instance.getAllDevices(hideDefaultNamed: true);
-      return all.where((d) => !_hiddenDeviceMacs.contains(d.macAddress)).toList();
+      final all = SharedDeviceDatabase.instance.getAllDevices(
+        hideDefaultNamed: true,
+      );
+      return all
+          .where((d) => !_hiddenDeviceMacs.contains(d.macAddress))
+          .toList();
     } catch (_) {
       return const [];
     }
@@ -111,20 +188,27 @@ class ArpScoutViewModel extends ChangeNotifier {
     // 1. Devices in SharedDeviceDatabase without custom names
     if (SharedDeviceDatabase.instance.isInitialized) {
       try {
-        final allDbDevices = SharedDeviceDatabase.instance.getAllDevices(hideDefaultNamed: false);
+        final allDbDevices = SharedDeviceDatabase.instance.getAllDevices(
+          hideDefaultNamed: false,
+        );
         for (final dev in allDbDevices) {
           if (!dev.hasCustomName) {
             final key = dev.macAddress;
             if (seenKeys.add(key)) {
-              final isShown = _showAutoDetected || _explicitlyShownMacs.contains(key);
-              results.add(UnknownDeviceEntry(
-                key: key,
-                macAddress: dev.macAddress,
-                displayName: dev.name.isNotEmpty ? dev.name : 'Device ${dev.macAddress}',
-                vendor: dev.vendor,
-                isInDatabase: true,
-                isHidden: !isShown,
-              ));
+              final isShown =
+                  _showAutoDetected || _explicitlyShownMacs.contains(key);
+              results.add(
+                UnknownDeviceEntry(
+                  key: key,
+                  macAddress: dev.macAddress,
+                  displayName: dev.name.isNotEmpty
+                      ? dev.name
+                      : 'Device ${dev.macAddress}',
+                  vendor: dev.vendor,
+                  isInDatabase: true,
+                  isHidden: !isShown,
+                ),
+              );
             }
           }
         }
@@ -141,18 +225,23 @@ class ArpScoutViewModel extends ChangeNotifier {
       final key = normMac;
       if (seenKeys.add(key)) {
         final isShown = _showAutoDetected || _explicitlyShownMacs.contains(key);
-        final displayName = (host.hostname != null && host.hostname!.trim().isNotEmpty)
+        final displayName =
+            (host.hostname != null && host.hostname!.trim().isNotEmpty)
             ? host.hostname!.trim()
-            : (host.customName?.isNotEmpty == true ? host.customName! : 'Device $normMac');
-        results.add(UnknownDeviceEntry(
-          key: key,
-          macAddress: normMac,
-          ip: host.ipAddress,
-          displayName: displayName,
-          vendor: host.vendor,
-          isInDatabase: false,
-          isHidden: !isShown,
-        ));
+            : (host.customName?.isNotEmpty == true
+                  ? host.customName!
+                  : 'Device $normMac');
+        results.add(
+          UnknownDeviceEntry(
+            key: key,
+            macAddress: normMac,
+            ip: host.ipAddress,
+            displayName: displayName,
+            vendor: host.vendor,
+            isInDatabase: false,
+            isHidden: !isShown,
+          ),
+        );
       }
     }
 
@@ -214,7 +303,9 @@ class ArpScoutViewModel extends ChangeNotifier {
       _hiddenDeviceMacs = prefs.hiddenDeviceMacs;
       _explicitlyShownMacs = prefs.explicitlyShownMacs;
       if (prefs.selectedDeviceMacs.isNotEmpty) {
-        _filter = _filter.copyWith(selectedDeviceMacs: prefs.selectedDeviceMacs);
+        _filter = _filter.copyWith(
+          selectedDeviceMacs: prefs.selectedDeviceMacs,
+        );
       }
     } catch (_) {}
   }
@@ -238,13 +329,19 @@ class ArpScoutViewModel extends ChangeNotifier {
   }
 
   void toggleDeviceVisibility(String key) {
-    final normalized = SharedDevice.isValidMac(key) ? SharedDevice.normalizeMac(key) : key;
-    final isKnown = allKnownCustomDevices.any((d) => d.macAddress == normalized);
+    final normalized = SharedDevice.isValidMac(key)
+        ? SharedDevice.normalizeMac(key)
+        : key;
+    final isKnown = allKnownCustomDevices.any(
+      (d) => d.macAddress == normalized,
+    );
 
     if (!isKnown) {
-      final isShown = _showAutoDetected || _explicitlyShownMacs.contains(normalized);
+      final isShown =
+          _showAutoDetected || _explicitlyShownMacs.contains(normalized);
       if (isShown) {
-        _explicitlyShownMacs = Set.from(_explicitlyShownMacs)..remove(normalized);
+        _explicitlyShownMacs = Set.from(_explicitlyShownMacs)
+          ..remove(normalized);
         if (_filter.selectedDeviceMacs.contains(normalized)) {
           toggleDevicePill(normalized);
         }
@@ -266,12 +363,17 @@ class ArpScoutViewModel extends ChangeNotifier {
   }
 
   void setDeviceHidden(String key, bool isHidden) {
-    final normalized = SharedDevice.isValidMac(key) ? SharedDevice.normalizeMac(key) : key;
-    final isKnown = allKnownCustomDevices.any((d) => d.macAddress == normalized);
+    final normalized = SharedDevice.isValidMac(key)
+        ? SharedDevice.normalizeMac(key)
+        : key;
+    final isKnown = allKnownCustomDevices.any(
+      (d) => d.macAddress == normalized,
+    );
 
     if (!isKnown) {
       if (isHidden) {
-        _explicitlyShownMacs = Set.from(_explicitlyShownMacs)..remove(normalized);
+        _explicitlyShownMacs = Set.from(_explicitlyShownMacs)
+          ..remove(normalized);
         if (_filter.selectedDeviceMacs.contains(normalized)) {
           toggleDevicePill(normalized);
         }
@@ -345,10 +447,11 @@ class ArpScoutViewModel extends ChangeNotifier {
     try {
       if (SharedDeviceDatabase.instance.isInitialized) {
         _repository.syncAllSharedDeviceNamesToLocalDb();
-        _sharedDbSubscription = SharedDeviceDatabase.instance.onDatabaseChanged.listen((_) {
-          _repository.syncAllSharedDeviceNamesToLocalDb();
-          _refreshQuery();
-        });
+        _sharedDbSubscription = SharedDeviceDatabase.instance.onDatabaseChanged
+            .listen((_) {
+              _repository.syncAllSharedDeviceNamesToLocalDb();
+              _refreshQuery();
+            });
       }
     } catch (e) {
       debugPrint('Shared device listener init error: $e');
@@ -379,6 +482,10 @@ class ArpScoutViewModel extends ChangeNotifier {
   }
 
   void selectAdapter(NetworkAdapterInfo adapter) {
+    if (adapter != _selectedAdapter) {
+      _roleSniffer.cancelIgmpListen();
+      _roles = L2RoleSniffResult.empty;
+    }
     _selectedAdapter = adapter;
     final subnet = adapter.subnetCidr;
     _scanProgress = _scanProgress.copyWith(
@@ -503,6 +610,10 @@ class ArpScoutViewModel extends ChangeNotifier {
     );
     notifyListeners();
 
+    final sniffFuture = (arpCacheOnly || _selectedAdapter.isAllInterfaces)
+        ? Future.value(L2RoleSniffResult.empty)
+        : _trackedStpSniff(_selectedAdapter.name);
+
     try {
       final results = await _repository.performSubnetSweep(
         targetSubnet: targetSubnet,
@@ -542,6 +653,18 @@ class ArpScoutViewModel extends ChangeNotifier {
         activeIps: results.map((r) => r.ipAddress).toSet(),
         markMissingAsStale: !arpCacheOnly && targetIps.length > 1,
       );
+
+      final sniffed = await sniffFuture;
+      if (!sniffed.isEmpty) {
+        _roles = L2RoleSniffResult(
+          stpRootMac: sniffed.stpRootMac ?? _roles.stpRootMac,
+          stpRootPriority: sniffed.stpRootPriority ?? _roles.stpRootPriority,
+          igmpQuerierIp: sniffed.igmpQuerierIp ?? _roles.igmpQuerierIp,
+          igmpQuerierVersion:
+              sniffed.igmpQuerierVersion ?? _roles.igmpQuerierVersion,
+        );
+      }
+      if (!arpCacheOnly) _startIgmpListener();
 
       _scanProgress = _scanProgress.copyWith(
         isScanning: false,
@@ -703,10 +826,7 @@ class ArpScoutViewModel extends ChangeNotifier {
     } else {
       next.add(status);
     }
-    _filter = _filter.copyWith(
-      selectedStatuses: next,
-      conflictsOnly: false,
-    );
+    _filter = _filter.copyWith(selectedStatuses: next, conflictsOnly: false);
     _refreshQuery();
   }
 
@@ -751,7 +871,7 @@ class ArpScoutViewModel extends ChangeNotifier {
       limit: pageSize,
       filter: _filter,
     );
-    _hosts = [..._hosts, ...nextBatch];
+    _hosts = [..._hosts, ..._applyRoles(nextBatch)];
     _isLoadingMore = false;
     notifyListeners();
   }
@@ -802,10 +922,8 @@ class ArpScoutViewModel extends ChangeNotifier {
     _statusCounts = _repository.getStatusCounts(_filter);
     _deviceCounts = _repository.getDeviceHostCounts(_filter);
     final currentLimit = _hosts.length > pageSize ? _hosts.length : pageSize;
-    _hosts = _repository.queryHosts(
-      offset: 0,
-      limit: currentLimit,
-      filter: _filter,
+    _hosts = _applyRoles(
+      _repository.queryHosts(offset: 0, limit: currentLimit, filter: _filter),
     );
 
     if (_selectedRecord != null) {
@@ -821,6 +939,7 @@ class ArpScoutViewModel extends ChangeNotifier {
   }
 
   Future<void> stopAllServices() async {
+    _roleSniffer.cancelIgmpListen();
     await stopScan();
   }
 
@@ -833,6 +952,7 @@ class ArpScoutViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _roleSniffer.cancelIgmpListen();
     _watchTimer?.cancel();
     _sharedDbSubscription?.cancel();
     _repository.dispose();

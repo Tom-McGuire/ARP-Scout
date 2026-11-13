@@ -1,6 +1,10 @@
 import 'dart:ui';
+
+import 'l2_role_pills.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../view_models/arp_scout_view_model.dart';
 import 'arp_control_bar.dart';
 import 'arp_detail_panel.dart';
@@ -49,13 +53,16 @@ class _ArpScoutScreenState extends State<ArpScoutScreen>
           // Tier 1 & 2: Top Control Bar + Conditional Scan/Conflict Alert Banner
           const ArpControlBar(),
 
+          if (context.select<ArpScoutViewModel, bool>(
+            (vm) => vm.l2RolesMisaligned,
+          ))
+            const L2RoleMisalignmentBanner(),
+
           // Tier 3: Dense Filter & Triage Toolbar (Search, IP, MAC/OUI, Vendor, Status Chips)
           const ArpFilterBar(),
 
           // Tier 4: Primary Data Workspace (Virtualized High-Density ARP Table)
-          const Expanded(
-            child: ArpTableView(),
-          ),
+          const Expanded(child: ArpTableView()),
 
           // Tier 5: Collapsible Bottom Detail Inspector
           if (hasSelection) const ArpDetailPanel(),
