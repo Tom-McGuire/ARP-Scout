@@ -5,7 +5,7 @@ import 'package:arp_scout/domain/models/host_status.dart';
 import 'package:arp_scout/ui/features/scout/view_models/arp_scout_view_model.dart';
 import 'package:arp_scout/ui/features/scout/views/arp_filter_bar.dart';
 import 'package:arp_scout/ui/features/scout/views/dialogs/device_library_dialog.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:network_suite_shared/network_suite_shared.dart';
 import 'package:provider/provider.dart';
@@ -49,7 +49,7 @@ void main() {
       ]);
 
       viewModel = ArpScoutViewModel(repository: repository);
-      await Future.delayed(const Duration(milliseconds: 30));
+      await viewModel.initializationFuture;
     });
 
     tearDown(() {

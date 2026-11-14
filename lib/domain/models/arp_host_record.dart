@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'host_status.dart';
+import 'open_web_port.dart';
 
 class ArpHostRecord {
   const ArpHostRecord({
@@ -30,6 +31,7 @@ class ArpHostRecord {
     this.stpRootPriority,
     this.isIgmpQuerier = false,
     this.igmpQuerierVersion,
+    this.openWebPorts = const [],
   });
 
   final int? id;
@@ -59,6 +61,9 @@ class ArpHostRecord {
   final int? stpRootPriority;
   final bool isIgmpQuerier;
   final String? igmpQuerierVersion; // "IGMPv2" / "IGMPv3"
+
+  /// Probed open HTTP/HTTPS web UI ports (transient; not persisted to SQLite).
+  final List<OpenWebPort> openWebPorts;
 
   DateTime get firstSeen => DateTime.fromMillisecondsSinceEpoch(firstSeenMs);
   DateTime get lastSeen => DateTime.fromMillisecondsSinceEpoch(lastSeenMs);
@@ -217,6 +222,7 @@ class ArpHostRecord {
     int? stpRootPriority,
     bool? isIgmpQuerier,
     String? igmpQuerierVersion,
+    List<OpenWebPort>? openWebPorts,
   }) {
     return ArpHostRecord(
       id: id ?? this.id,
@@ -244,6 +250,7 @@ class ArpHostRecord {
       stpRootPriority: stpRootPriority ?? this.stpRootPriority,
       isIgmpQuerier: isIgmpQuerier ?? this.isIgmpQuerier,
       igmpQuerierVersion: igmpQuerierVersion ?? this.igmpQuerierVersion,
+      openWebPorts: openWebPorts ?? this.openWebPorts,
     );
   }
 

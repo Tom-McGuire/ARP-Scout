@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'l2_role_pills.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../view_models/arp_scout_view_model.dart';

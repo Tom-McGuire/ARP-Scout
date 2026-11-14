@@ -8,11 +8,13 @@ import '../../../../data/services/import/csv_import_service.dart';
 import '../../../../data/services/oui/oui_lookup_service.dart';
 import '../../../../data/services/scanner/l2_role_sniffer_service.dart';
 import '../../../../data/services/scanner/subnet_scanner_service.dart';
+import '../../../../data/services/scanner/web_port_probe_service.dart';
 import '../../../../data/services/storage/arp_scout_preferences_service.dart';
 import '../../../../domain/models/arp_filter.dart';
 import '../../../../domain/models/arp_host_record.dart';
 import '../../../../domain/models/host_status.dart';
 import '../../../../domain/models/network_adapter_info.dart';
+import '../../../../domain/models/open_web_port.dart';
 import '../../../../domain/models/scan_progress.dart';
 import '../../../../domain/models/unknown_device_entry.dart';
 
@@ -24,17 +26,27 @@ class ArpScoutViewModel extends ChangeNotifier {
     this.initialAdapterName,
     bool autoStart = false,
     L2RoleSnifferService? roleSniffer,
+    WebPortProbeService? webPortProbeService,
   }) : initialAutoStart = autoStart,
        _roleSniffer = roleSniffer ?? L2RoleSnifferService(),
+       _webPortProbeService = webPortProbeService ?? WebPortProbeService(),
        _repository = repository ?? ArpRepository() {
-    _init();
+    _refreshQuery(notify: false);
+    initializationFuture = _init();
   }
+
+  late final Future<void> initializationFuture;
 
   final ArpRepository _repository;
   final L2RoleSnifferService _roleSniffer;
+  final WebPortProbeService _webPortProbeService;
   L2RoleSniffResult _roles = L2RoleSniffResult.empty;
   bool _sniffingStp = false;
   bool _listeningIgmp = false;
+  bool _probeWebPortsEnabled = true;
+  bool _isProbingWebPorts = false;
+  int _webProbeGeneration = 0;
+  final Map<String, List<OpenWebPort>> _openWebPortsByIp = {};
   final String? initialSubnet;
   final String? initialAdapterIp;
   final String? initialAdapterName;
@@ -69,6 +81,56 @@ class ArpScoutViewModel extends ChangeNotifier {
   /// True while a passive STP capture or long IGMP querier listen is running.
   bool get isL2RoleListening => _sniffingStp || _listeningIgmp;
   bool get isListeningForIgmp => _listeningIgmp;
+  bool get probeWebPortsEnabled => _probeWebPortsEnabled;
+  bool get isProbingWebPorts => _isProbingWebPorts;
+
+  void toggleWebPortProbe() {
+    _probeWebPortsEnabled = !_probeWebPortsEnabled;
+    notifyListeners();
+  }
+
+  Future<void> probeHostWebPorts(String ipAddress) async {
+    if (ipAddress.trim().isEmpty) return;
+    final gen = _webProbeGeneration;
+    _isProbingWebPorts = true;
+    notifyListeners();
+    try {
+      final ports = await _webPortProbeService.probeHost(ipAddress);
+      if (gen != _webProbeGeneration || _isDisposed) return;
+      _openWebPortsByIp[ipAddress] = ports;
+      _refreshQuery();
+    } finally {
+      if (gen == _webProbeGeneration) {
+        _isProbingWebPorts = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  void _startWebPortProbe(Iterable<String> onlineIps) {
+    final ips = onlineIps.where((ip) => ip.trim().isNotEmpty).toSet().toList();
+    if (ips.isEmpty) return;
+    final gen = _webProbeGeneration;
+    _isProbingWebPorts = true;
+    notifyListeners();
+    unawaited(
+      _webPortProbeService.probeHosts(ips).then((results) {
+        if (gen != _webProbeGeneration || _isDisposed) return;
+        _openWebPortsByIp.addAll(results);
+        _isProbingWebPorts = false;
+        _refreshQuery();
+      }).catchError((_) {
+        if (gen == _webProbeGeneration && !_isDisposed) {
+          _isProbingWebPorts = false;
+          notifyListeners();
+        }
+      }),
+    );
+  }
+
+  Future<bool> openWebPortUrl(String url) {
+    return WebPortProbeService.openUrlInBrowser(url);
+  }
 
   void _startIgmpListener() {
     if (_listeningIgmp || _selectedAdapter.isAllInterfaces) return;
@@ -105,7 +167,7 @@ class ArpScoutViewModel extends ChangeNotifier {
   }
 
   List<ArpHostRecord> _applyRoles(List<ArpHostRecord> hosts) {
-    if (_roles.isEmpty) return hosts;
+    if (_roles.isEmpty && _openWebPortsByIp.isEmpty) return hosts;
     final rootMac = _roles.stpRootMac == null
         ? null
         : ArpHostRecord.normalizeMac(_roles.stpRootMac!);
@@ -124,6 +186,7 @@ class ArpScoutViewModel extends ChangeNotifier {
           igmpQuerierVersion: h.ipAddress == _roles.igmpQuerierIp
               ? _roles.igmpQuerierVersion
               : null,
+          openWebPorts: _openWebPortsByIp[h.ipAddress] ?? const [],
         ),
     ];
   }
@@ -665,6 +728,13 @@ class ArpScoutViewModel extends ChangeNotifier {
         );
       }
       if (!arpCacheOnly) _startIgmpListener();
+      if (!arpCacheOnly && _probeWebPortsEnabled) {
+        _startWebPortProbe(
+          results
+              .where((r) => r.status == HostStatus.online)
+              .map((r) => r.ipAddress),
+        );
+      }
 
       _scanProgress = _scanProgress.copyWith(
         isScanning: false,
@@ -877,6 +947,10 @@ class ArpScoutViewModel extends ChangeNotifier {
   }
 
   void clearHosts() {
+    _webProbeGeneration++;
+    _isProbingWebPorts = false;
+    _openWebPortsByIp.clear();
+    _roles = L2RoleSniffResult.empty;
     _repository.clearAll();
     _selectedRecord = null;
     _loadedFileName = null;

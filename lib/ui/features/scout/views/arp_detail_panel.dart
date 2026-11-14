@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -388,9 +388,70 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                     ),
                   ),
                 ),
+                OutlinedButton.icon(
+                  onPressed: vm.isProbingWebPorts
+                      ? null
+                      : () => vm.probeHostWebPorts(record.ipAddress),
+                  icon: vm.isProbingWebPorts
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.radar, size: 16),
+                  label: const Text('Probe Ports Now'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
+          if (record.openWebPorts.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final port in record.openWebPorts) ...[
+                    FilledButton.icon(
+                      onPressed: () =>
+                          vm.openWebPortUrl(port.buildUrl(record.ipAddress)),
+                      icon: Icon(
+                        port.isHttps ? Icons.lock : Icons.public,
+                        size: 16,
+                      ),
+                      label: Text(
+                        '${port.isHttps ? '🔒' : '🌐'} Open Web Browser — ${port.buildUrl(record.ipAddress)}',
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: port.isHttps
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFF0284C7),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                ],
+              ),
+            ),
+          ],
 
           // Metadata Grid
           Wrap(

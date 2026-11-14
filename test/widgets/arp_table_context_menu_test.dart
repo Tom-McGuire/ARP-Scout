@@ -1,6 +1,6 @@
 import 'package:arp_scout/domain/models/arp_host_record.dart';
 import 'package:arp_scout/domain/models/host_status.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

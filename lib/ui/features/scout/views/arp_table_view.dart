@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +11,7 @@ import '../../../../data/services/ipc/inter_app_launcher.dart';
 import '../../../../domain/models/arp_host_record.dart';
 import '../../../../domain/models/host_status.dart';
 import 'l2_role_pills.dart';
+import 'web_port_pills.dart';
 import '../view_models/arp_scout_view_model.dart';
 
 enum ArpTableColumn {
@@ -560,6 +561,13 @@ class _ArpTableViewState extends State<ArpTableView> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (record.openWebPorts.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    WebPortPills(
+                      record: record,
+                      onOpenUrl: (url) => vm.openWebPortUrl(url),
+                    ),
+                  ],
                   Tooltip(
                     message:
                         'Trace Route in Net Route Scout (${record.ipAddress})',
@@ -764,6 +772,29 @@ class _ArpTableViewState extends State<ArpTableView> {
             ],
           ),
         ),
+        for (final port in record.openWebPorts)
+          PopupMenuItem(
+            value: 'open_web_${port.port}',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  port.isHttps ? Icons.lock : Icons.public,
+                  size: 16,
+                  color: port.isHttps
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFF38BDF8),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Open Web UI (${record.ipAddress}:${port.port})',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: 'edit_name',
@@ -950,6 +981,18 @@ class _ArpTableViewState extends State<ArpTableView> {
         case 'simulate_conflict':
           vm.simulateRogueMacConflict(target: record);
           break;
+        default:
+          if (value.startsWith('open_web_')) {
+            final portNum = int.tryParse(value.substring('open_web_'.length));
+            if (portNum != null) {
+              for (final port in record.openWebPorts) {
+                if (port.port == portNum) {
+                  vm.openWebPortUrl(port.buildUrl(record.ipAddress));
+                  break;
+                }
+              }
+            }
+          }
       }
     });
   }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -406,6 +406,60 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 8),
+
+                              // Web Port Probe Toggle (80, 443, 8080-8085)
+                              Tooltip(
+                                message:
+                                    'Probe Web Ports (80, 443, 8080–8085) on online hosts',
+                                child: OutlinedButton.icon(
+                                  onPressed: () => vm.toggleWebPortProbe(),
+                                  icon: Icon(
+                                    Icons.language,
+                                    size: 15,
+                                    color: vm.probeWebPortsEnabled
+                                        ? const Color(0xFF38BDF8)
+                                        : Colors.grey,
+                                  ),
+                                  label: Text(
+                                    'Web Ports',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: vm.probeWebPortsEnabled
+                                          ? const Color(0xFF38BDF8)
+                                          : Colors.white70,
+                                      fontWeight: vm.probeWebPortsEnabled
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(
+                                      color: vm.probeWebPortsEnabled
+                                          ? const Color(0xFF38BDF8)
+                                          : const Color(0xFF3E3E42),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (vm.isProbingWebPorts) ...[
+                                const SizedBox(width: 8),
+                                const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF38BDF8),
+                                  ),
+                                ),
+                              ],
                               if (vm.isL2RoleListening) ...[
                                 const SizedBox(width: 10),
                                 Tooltip(

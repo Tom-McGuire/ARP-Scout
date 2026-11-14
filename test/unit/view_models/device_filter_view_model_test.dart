@@ -70,7 +70,7 @@ void main() {
       ]);
 
       viewModel = ArpScoutViewModel(repository: repository);
-      await Future.delayed(const Duration(milliseconds: 30));
+      await viewModel.initializationFuture;
     });
 
     tearDown(() {
