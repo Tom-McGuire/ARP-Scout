@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
+import '../../../theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -196,7 +197,7 @@ class _ArpTableViewState extends State<ArpTableView> {
                 : (hasActiveFilter
                       ? 'No hosts match your active search filters'
                       : 'No ARP or Subnet Discovery Data Loaded'),
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
@@ -205,7 +206,7 @@ class _ArpTableViewState extends State<ArpTableView> {
                 : (hasActiveFilter
                       ? 'Try clearing your search query or status filter chips'
                       : 'Select a network interface above and click "Sweep Subnet", or read your local ARP cache.'),
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
           const SizedBox(height: 20),
           if (hasActiveFilter)
@@ -382,7 +383,7 @@ class _ArpTableViewState extends State<ArpTableView> {
                   fontWeight: FontWeight.w600,
                   color: record.hasConflict
                       ? const Color(0xFFFCA5A5)
-                      : Colors.white,
+                      : AppTheme.textPrimary,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -420,7 +421,7 @@ class _ArpTableViewState extends State<ArpTableView> {
                       ),
                       child: Text(
                         '+${record.conflictingMacs.length - 1}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 9,
                           fontFamily: 'monospace',
                           fontWeight: FontWeight.bold,
@@ -441,7 +442,7 @@ class _ArpTableViewState extends State<ArpTableView> {
                   Flexible(
                     child: Text(
                       record.vendor,
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -507,7 +508,7 @@ class _ArpTableViewState extends State<ArpTableView> {
               width: widths[ArpTableColumn.ttl],
               child: Text(
                 record.osHintFromTtl,
-                style: const TextStyle(fontSize: 11, color: Colors.white70),
+                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -517,7 +518,7 @@ class _ArpTableViewState extends State<ArpTableView> {
               width: widths[ArpTableColumn.discovery],
               child: Text(
                 record.discoveryMethod,
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                style: TextStyle(fontSize: 11, color: Colors.grey),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -527,7 +528,7 @@ class _ArpTableViewState extends State<ArpTableView> {
               width: widths[ArpTableColumn.lastSeen],
               child: Text(
                 _timeFormatter.format(record.lastSeen),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontFamily: 'monospace',
                   color: Colors.grey,
@@ -552,7 +553,7 @@ class _ArpTableViewState extends State<ArpTableView> {
                         fontSize: 12,
                         color: record.hasConflict
                             ? const Color(0xFFFCA5A5)
-                            : Colors.white70,
+                            : AppTheme.textSecondary,
                         fontWeight: record.hasConflict
                             ? FontWeight.w600
                             : FontWeight.normal,
@@ -654,7 +655,7 @@ class _ArpTableViewState extends State<ArpTableView> {
           const SizedBox(width: 8),
           Text(
             'Loading more hosts... ($currentCount of ${vm.totalHostCount} loaded)',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),
@@ -683,7 +684,7 @@ class _ArpTableViewState extends State<ArpTableView> {
           const SizedBox(width: 6),
           Text(
             'Showing $loadedCount of ${vm.totalHostCount} matching hosts (${vm.unfilteredTotalCount} total in SQLite)',
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
           ),
           if (conflictCount > 0) ...[
             const SizedBox(width: 12),
@@ -698,7 +699,7 @@ class _ArpTableViewState extends State<ArpTableView> {
               ),
               child: Text(
                 '• $conflictCount IP ${conflictCount == 1 ? "CONFLICT" : "CONFLICTS"}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFFEF4444),
@@ -710,7 +711,7 @@ class _ArpTableViewState extends State<ArpTableView> {
             const SizedBox(width: 12),
             Text(
               '• Last Sweep: ${_timeFormatter.format(lastScan)}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontFamily: 'monospace',
                 color: Colors.grey,
@@ -721,7 +722,7 @@ class _ArpTableViewState extends State<ArpTableView> {
           Expanded(
             child: Text(
               vm.scanProgress.currentPhase,
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              style: TextStyle(fontSize: 11, color: Colors.grey),
               textAlign: TextAlign.right,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1048,7 +1049,7 @@ class _ArpTableViewState extends State<ArpTableView> {
     final shouldBrowse = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: AppTheme.surface,
         title: const Row(
           children: [
             Icon(Icons.alt_route, size: 20, color: Color(0xFF38BDF8)),
@@ -1058,7 +1059,7 @@ class _ArpTableViewState extends State<ArpTableView> {
         ),
         content: Text(
           'Net Route Scout ($expectedName) could not be located in standard directories.\n\nWould you like to browse and select where Net Route Scout is installed on your computer?',
-          style: const TextStyle(fontSize: 13, color: Colors.white70),
+          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
@@ -1128,7 +1129,7 @@ class _ArpTableViewState extends State<ArpTableView> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
+          backgroundColor: AppTheme.surface,
           title: const Row(
             children: [
               Icon(Icons.devices, size: 20, color: Color(0xFF38BDF8)),
@@ -1156,13 +1157,13 @@ class _ArpTableViewState extends State<ArpTableView> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF141414),
+                      color: AppTheme.scaffoldBg,
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF3E3E42)),
+                      border: Border.all(color: AppTheme.borderStrong),
                     ),
                     child: Text(
                       '${record.macAddress} • ${record.vendor}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
                         color: Color(0xFF38BDF8),
@@ -1173,7 +1174,7 @@ class _ArpTableViewState extends State<ArpTableView> {
                   TextFormField(
                     controller: controller,
                     autofocus: true,
-                    style: const TextStyle(fontSize: 13, color: Colors.white),
+                    style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
                       labelText: 'Friendly Device Name',
                       hintText: 'e.g. Living Room Apple TV, Core Switch',

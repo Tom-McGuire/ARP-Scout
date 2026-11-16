@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:network_suite_shared/network_suite_shared.dart';
 import 'package:provider/provider.dart';
 import 'package:arp_scout/domain/models/unknown_device_entry.dart';
+import 'package:arp_scout/ui/theme/app_theme.dart';
 import '../../view_models/arp_scout_view_model.dart';
 import 'edit_device_dialog.dart';
 
@@ -72,7 +73,7 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
     }).toList();
 
     return Dialog(
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: AppTheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
       child: ConstrainedBox(
@@ -98,12 +99,12 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Custom Library',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                           ),
                         ),
                         Text(
@@ -152,7 +153,7 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
                 height: 36,
                 child: TextField(
                   controller: _searchCtrl,
-                  style: const TextStyle(fontSize: 12),
+                  style: TextStyle(fontSize: 12),
                   onChanged: (val) => setState(() => _searchQuery = val.trim()),
                   decoration: InputDecoration(
                     hintText: 'Search devices by name, MAC, IP, vendor, or notes...',
@@ -167,15 +168,15 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
                           )
                         : null,
                     filled: true,
-                    fillColor: const Color(0xFF252526),
+                    fillColor: AppTheme.surfaceHigh,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF3E3E42)),
+                      borderSide: BorderSide(color: AppTheme.borderStrong),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF3E3E42)),
+                      borderSide: BorderSide(color: AppTheme.borderStrong),
                     ),
                   ),
                 ),
@@ -269,12 +270,12 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF252526),
+              color: AppTheme.surfaceHigh,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: isVisible
                     ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.35)
-                    : const Color(0xFF3E3E42),
+                    : AppTheme.borderStrong,
               ),
             ),
             child: Row(
@@ -303,10 +304,10 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
                           Flexible(
                             child: Text(
                               device.name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
-                                color: Colors.white,
+                                color: AppTheme.textPrimary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -355,7 +356,7 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
                               ),
                               child: Text(
                                 '$count in ARP table',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10,
                                   color: Colors.blueAccent,
                                   fontWeight: FontWeight.bold,
@@ -368,7 +369,7 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
                       const SizedBox(height: 2),
                       Text(
                         '${device.macAddress} • ${device.vendor ?? "Unknown Vendor"} • ${device.category.label}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontFamily: 'monospace',
                           color: Colors.grey,
@@ -468,12 +469,12 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF252526),
+              color: AppTheme.surfaceHigh,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: isVisible
                     ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.35)
-                    : const Color(0xFF3E3E42),
+                    : AppTheme.borderStrong,
               ),
             ),
             child: Row(
@@ -502,10 +503,10 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
                           Flexible(
                             child: Text(
                               device.displayName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
-                                color: Colors.white,
+                                color: AppTheme.textPrimary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -554,7 +555,7 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
                               ),
                               child: Text(
                                 '$count in ARP table',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10,
                                   color: Colors.blueAccent,
                                   fontWeight: FontWeight.bold,
@@ -567,7 +568,7 @@ class _DeviceLibraryDialogState extends State<DeviceLibraryDialog>
                       const SizedBox(height: 2),
                       Text(
                         '${device.macAddress ?? "No MAC"} • ${device.ip ?? "No IP"} • ${device.vendor ?? "Unknown Vendor"}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontFamily: 'monospace',
                           color: Colors.grey,

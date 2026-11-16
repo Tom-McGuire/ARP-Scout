@@ -362,7 +362,7 @@ packages:
     description:
       path: "."
       ref: main
-      resolved-ref: d7905ee7a7820cc21e7d9b48b97d7d45e9577218
+      resolved-ref: "65d651f39dabd9b3b89dab5dc7b914d8d1249541"
       url: "https://github.com/Tom-McGuire/network-suite-shared.git"
     source: git
     version: "1.0.0"

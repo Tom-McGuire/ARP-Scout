@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
+import '../../../theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -85,7 +86,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                 const SizedBox(width: 10),
                 Text(
                   record.ipAddress,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                     fontFamily: 'monospace',
@@ -96,7 +97,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                 const SizedBox(width: 8),
                 Text(
                   record.macAddress,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontFamily: 'monospace',
                     color: Color(0xFF38BDF8),
@@ -119,7 +120,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                     ),
                     child: Text(
                       record.customName!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF38BDF8),
@@ -131,7 +132,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                 Flexible(
                   child: Text(
                     '(${record.vendor})',
-                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -144,11 +145,11 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                   child: TabBar(
                     controller: _tabController,
                     isScrollable: false,
-                    labelStyle: const TextStyle(
+                    labelStyle: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
-                    unselectedLabelStyle: const TextStyle(fontSize: 11),
+                    unselectedLabelStyle: TextStyle(fontSize: 11),
                     indicatorSize: TabBarIndicatorSize.tab,
                     dividerColor: Colors.transparent,
                     tabs: const [
@@ -246,7 +247,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
               padding: const EdgeInsets.all(10),
               margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
+                color: AppTheme.surfaceHigh,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: Theme.of(context).dividerColor),
               ),
@@ -261,12 +262,12 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                   if (record.isStpRootBridge)
                     Text(
                       '👑 STP Root Bridge — priority ${record.stpRootPriority ?? 'unknown'}',
-                      style: const TextStyle(fontSize: 12, color: stpRootColor),
+                      style: TextStyle(fontSize: 12, color: stpRootColor),
                     ),
                   if (record.isIgmpQuerier)
                     Text(
                       '📡 Active IGMP Querier — ${record.igmpQuerierVersion ?? 'version unknown'}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         color: igmpQuerierColor,
                       ),
@@ -300,7 +301,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                       const SizedBox(width: 6),
                       Text(
                         'L2/L3 IP ADDRESS CONFLICT DIAGNOSTIC — ${record.conflictingMacs.length} COMPETING MAC ADDRESSES CLAIMING ${record.ipAddress}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFFFCA5A5),
@@ -322,9 +323,9 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF141414),
+                            color: AppTheme.scaffoldBg,
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFF3E3E42)),
+                            border: Border.all(color: AppTheme.borderStrong),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -337,17 +338,17 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                               const SizedBox(width: 6),
                               Text(
                                 mac,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'monospace',
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: AppTheme.textPrimary,
                                 ),
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 '($vendor)',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   color: Colors.grey,
                                 ),
@@ -382,7 +383,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                       horizontal: 14,
                       vertical: 8,
                     ),
-                    textStyle: const TextStyle(
+                    textStyle: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -405,7 +406,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                       horizontal: 14,
                       vertical: 8,
                     ),
-                    textStyle: const TextStyle(
+                    textStyle: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -440,7 +441,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                           horizontal: 14,
                           vertical: 10,
                         ),
-                        textStyle: const TextStyle(
+                        textStyle: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
@@ -514,7 +515,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
             const SizedBox(height: 8),
             Text(
               'DIAGNOSTIC NOTES: ${record.notes}',
-              style: const TextStyle(fontSize: 12, color: Colors.white70),
+              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
             ),
           ],
         ],
@@ -546,7 +547,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
               const Spacer(),
               Text(
                 'Sender: ${record.macAddress} (${record.ipAddress})',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontFamily: 'monospace',
                   color: Color(0xFF38BDF8),
@@ -560,14 +561,14 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF141414),
+                color: AppTheme.scaffoldBg,
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFF2C2C2C)),
+                border: Border.all(color: AppTheme.border),
               ),
               child: SingleChildScrollView(
                 child: SelectableText(
                   formattedHexDump,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'monospace',
                     fontSize: 11,
                     height: 1.35,
@@ -637,13 +638,13 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF141414),
+              color: AppTheme.scaffoldBg,
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFF2C2C2C)),
+              border: Border.all(color: AppTheme.border),
             ),
             child: SelectableText(
               cliCommand,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 12,
                 color: Color(0xFF38BDF8),
@@ -665,13 +666,13 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF141414),
+              color: AppTheme.scaffoldBg,
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFF2C2C2C)),
+              border: Border.all(color: AppTheme.border),
             ),
             child: SelectableText(
               rawArp,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 12,
                 color: Color(0xFFD4D4D4),
@@ -722,7 +723,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w600,
             color: Colors.grey,
@@ -735,9 +736,9 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
+              color: AppTheme.surface,
               borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: const Color(0xFF3E3E42)),
+              border: Border.all(color: AppTheme.borderStrong),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -751,7 +752,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                         : FontWeight.w500,
                     color: record.customName != null
                         ? const Color(0xFF38BDF8)
-                        : Colors.white,
+                        : AppTheme.textPrimary,
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -775,7 +776,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w600,
             color: Colors.grey,
@@ -845,7 +846,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
     final shouldBrowse = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: AppTheme.surface,
         title: const Row(
           children: [
             Icon(Icons.alt_route, size: 20, color: Color(0xFF38BDF8)),
@@ -855,7 +856,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
         ),
         content: Text(
           'Net Route Scout ($expectedName) could not be located in standard directories.\n\nWould you like to browse and select where Net Route Scout is installed on your computer?',
-          style: const TextStyle(fontSize: 13, color: Colors.white70),
+          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
@@ -924,7 +925,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
+          backgroundColor: AppTheme.surface,
           title: const Row(
             children: [
               Icon(Icons.devices, size: 20, color: Color(0xFF38BDF8)),
@@ -952,13 +953,13 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF141414),
+                      color: AppTheme.scaffoldBg,
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF3E3E42)),
+                      border: Border.all(color: AppTheme.borderStrong),
                     ),
                     child: Text(
                       '${record.macAddress} • ${record.vendor}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
                         color: Color(0xFF38BDF8),
@@ -969,7 +970,7 @@ class _ArpDetailPanelState extends State<ArpDetailPanel>
                   TextFormField(
                     controller: controller,
                     autofocus: true,
-                    style: const TextStyle(fontSize: 13, color: Colors.white),
+                    style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
                       labelText: 'Friendly Device Name',
                       hintText: 'e.g. Living Room Apple TV, Core Switch',

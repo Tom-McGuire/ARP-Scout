@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import '../../../theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -35,10 +36,10 @@ class _ArpControlBarState extends State<ArpControlBar> {
           // TIER 1: Top Control Bar (Canonical 52px height)
           Container(
             height: 52,
-            decoration: const BoxDecoration(
-              color: Color(0xFF1E1E1E),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
               border: Border(
-                bottom: BorderSide(color: Color(0xFF2C2C2C), width: 1),
+                bottom: BorderSide(color: AppTheme.border, width: 1),
               ),
             ),
             child: LayoutBuilder(
@@ -69,7 +70,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Column(
+                              Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -79,14 +80,14 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.8,
-                                      color: Colors.white,
+                                      color: AppTheme.textPrimary,
                                     ),
                                   ),
                                   Text(
                                     'L2/L3 Discovery • OUI Lookup • Conflict Detector',
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.white54,
+                                      color: AppTheme.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -101,10 +102,10 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                   horizontal: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF252526),
+                                  color: AppTheme.surfaceHigh,
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                    color: const Color(0xFF3E3E42),
+                                    color: AppTheme.borderStrong,
                                   ),
                                 ),
                                 child: DropdownButtonHideUnderline(
@@ -114,15 +115,15 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                         ? vm.selectedAdapter
                                         : vm.adapters.first,
                                     isDense: true,
-                                    icon: const Icon(
+                                    icon: Icon(
                                       Icons.arrow_drop_down,
                                       size: 18,
                                     ),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.white,
+                                      color: AppTheme.textPrimary,
                                     ),
-                                    dropdownColor: const Color(0xFF252526),
+                                    dropdownColor: AppTheme.surfaceHigh,
                                     onChanged: isScanning
                                         ? null
                                         : (adapter) {
@@ -168,7 +169,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                               const SizedBox(width: 4),
                               IconButton(
                                 tooltip: 'Refresh Interfaces',
-                                icon: const Icon(Icons.refresh, size: 16),
+                                icon: Icon(Icons.refresh, size: 16),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(
                                   minWidth: 26,
@@ -207,25 +208,25 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                       horizontal: 8,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF252526),
+                                      color: AppTheme.surfaceHigh,
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
-                                        color: const Color(0xFF3E3E42),
+                                        color: AppTheme.borderStrong,
                                       ),
                                     ),
                                     child: DropdownButtonHideUnderline(
                                       child: DropdownButton<String>(
                                         value: currentSubnet,
                                         isDense: true,
-                                        icon: const Icon(
+                                        icon: Icon(
                                           Icons.arrow_drop_down,
                                           size: 18,
                                         ),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.white,
+                                          color: AppTheme.textPrimary,
                                         ),
-                                        dropdownColor: const Color(0xFF252526),
+                                        dropdownColor: AppTheme.surfaceHigh,
                                         onChanged: isScanning
                                             ? null
                                             : (val) {
@@ -255,7 +256,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                                   const SizedBox(width: 6),
                                                   Text(
                                                     cidr,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       fontFamily: 'monospace',
                                                       fontSize: 12,
                                                     ),
@@ -293,7 +294,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                               ),
                               IconButton(
                                 tooltip: 'Enter custom subnet or IP range',
-                                icon: const Icon(Icons.edit_outlined, size: 14),
+                                icon: Icon(Icons.edit_outlined, size: 14),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(
                                   minWidth: 26,
@@ -335,7 +336,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                 ),
                                 label: Text(
                                   isScanning ? 'Stop Sweep' : 'Sweep Subnet',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),
@@ -350,7 +351,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                     : () => vm.startSubnetScan(
                                         arpCacheOnly: true,
                                       ),
-                                icon: const Icon(Icons.bolt, size: 16),
+                                icon: Icon(Icons.bolt, size: 16),
                                 label: const Text(
                                   'Read ARP Cache',
                                   style: TextStyle(fontSize: 12),
@@ -385,7 +386,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                     fontSize: 12,
                                     color: isWatching
                                         ? const Color(0xFF10B981)
-                                        : Colors.white70,
+                                        : AppTheme.textSecondary,
                                     fontWeight: isWatching
                                         ? FontWeight.bold
                                         : FontWeight.normal,
@@ -395,7 +396,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                   side: BorderSide(
                                     color: isWatching
                                         ? const Color(0xFF10B981)
-                                        : const Color(0xFF3E3E42),
+                                        : AppTheme.borderStrong,
                                   ),
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
@@ -427,7 +428,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                       fontSize: 12,
                                       color: vm.probeWebPortsEnabled
                                           ? const Color(0xFF38BDF8)
-                                          : Colors.white70,
+                                          : AppTheme.textSecondary,
                                       fontWeight: vm.probeWebPortsEnabled
                                           ? FontWeight.bold
                                           : FontWeight.normal,
@@ -437,7 +438,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                     side: BorderSide(
                                       color: vm.probeWebPortsEnabled
                                           ? const Color(0xFF38BDF8)
-                                          : const Color(0xFF3E3E42),
+                                          : AppTheme.borderStrong,
                                     ),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 10,
@@ -482,7 +483,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                         vm.isListeningForIgmp
                                             ? 'Listening: IGMP querier'
                                             : 'Listening: STP',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 11,
                                           color: Color(0xFF14B8A6),
                                         ),
@@ -536,7 +537,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                         ),
                                         child: Text(
                                           vm.loadedFileName!,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -546,7 +547,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                       const SizedBox(width: 4),
                                       InkWell(
                                         onTap: () => vm.closeLoadedFile(),
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.close,
                                           size: 13,
                                           color: Colors.grey,
@@ -563,7 +564,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                 onPressed: vm.isImporting
                                     ? null
                                     : () => _handleImportCsv(context, vm),
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.file_open_outlined,
                                   size: 15,
                                 ),
@@ -587,7 +588,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                               OutlinedButton.icon(
                                 onPressed: () =>
                                     DeviceLibraryDialog.show(context),
-                                icon: const Icon(Icons.devices, size: 15),
+                                icon: Icon(Icons.devices, size: 15),
                                 label: const Text(
                                   'Device Library',
                                   style: TextStyle(fontSize: 11),
@@ -609,7 +610,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                 onPressed: isScanning
                                     ? null
                                     : () => vm.loadDemoTopology(),
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.play_circle_outline,
                                   size: 15,
                                 ),
@@ -636,7 +637,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                     vm.unfilteredTotalCount == 0 || isScanning
                                     ? null
                                     : () => _confirmClear(context, vm),
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.delete_sweep_outlined,
                                   size: 15,
                                 ),
@@ -718,29 +719,29 @@ class _ArpControlBarState extends State<ArpControlBar> {
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                      color: const Color(0xFF3E3E42),
+                                      color: AppTheme.borderStrong,
                                     ),
                                   ),
-                                  child: const Row(
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
                                         Icons.download,
                                         size: 15,
-                                        color: Colors.white70,
+                                        color: AppTheme.textSecondary,
                                       ),
-                                      SizedBox(width: 6),
+                                      const SizedBox(width: 6),
                                       Text(
                                         'Export',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: Colors.white70,
+                                          color: AppTheme.textSecondary,
                                         ),
                                       ),
                                       Icon(
                                         Icons.arrow_drop_down,
                                         size: 14,
-                                        color: Colors.white70,
+                                        color: AppTheme.textSecondary,
                                       ),
                                     ],
                                   ),
@@ -775,7 +776,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                   const SizedBox(width: 10),
                   Text(
                     progress.currentPhase,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF38BDF8),
@@ -789,7 +790,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                         child: LinearProgressIndicator(
                           value: progress.progressFraction,
                           minHeight: 6,
-                          backgroundColor: const Color(0xFF252526),
+                          backgroundColor: AppTheme.surfaceHigh,
                           color: const Color(0xFF007ACC),
                         ),
                       ),
@@ -799,10 +800,10 @@ class _ArpControlBarState extends State<ArpControlBar> {
                   const SizedBox(width: 12),
                   Text(
                     'Target: ${progress.targetSubnet}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontFamily: 'monospace',
-                      color: Colors.white70,
+                      color: AppTheme.textSecondary,
                     ),
                   ),
                 ],
@@ -823,7 +824,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.warning_amber_rounded,
                     size: 16,
                     color: Color(0xFFEF4444),
@@ -832,7 +833,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
                   Expanded(
                     child: Text(
                       'IP ADDRESS CONFLICT DETECTED: $conflictCount IPv4 ${conflictCount == 1 ? "address is" : "addresses are"} claimed by multiple physical MAC addresses on this subnet!',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFFFCA5A5),
@@ -859,10 +860,10 @@ class _ArpControlBarState extends State<ArpControlBar> {
                         vm.filter.conflictsOnly
                             ? 'SHOW ALL HOSTS'
                             : 'ISOLATE CONFLICTS ($conflictCount)',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: AppTheme.textPrimary,
                         ),
                       ),
                     ),
@@ -878,24 +879,24 @@ class _ArpControlBarState extends State<ArpControlBar> {
               color: Colors.red.shade900.withValues(alpha: 0.85),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.error_outline,
                     size: 16,
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       progress.lastError!,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      style: TextStyle(color: AppTheme.textPrimary, fontSize: 12),
                     ),
                   ),
                   IconButton(
                     tooltip: 'Copy error message',
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.copy,
                       size: 13,
-                      color: Colors.white70,
+                      color: AppTheme.textSecondary,
                     ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
@@ -911,10 +912,10 @@ class _ArpControlBarState extends State<ArpControlBar> {
                   const SizedBox(width: 4),
                   IconButton(
                     tooltip: 'Dismiss error banner',
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.close,
                       size: 14,
-                      color: Colors.white70,
+                      color: AppTheme.textSecondary,
                     ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
@@ -1035,7 +1036,7 @@ class _ArpControlBarState extends State<ArpControlBar> {
               TextField(
                 controller: controller,
                 autofocus: true,
-                style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                style: TextStyle(fontSize: 13, fontFamily: 'monospace'),
                 decoration: const InputDecoration(
                   hintText: 'e.g. 192.168.1.0/24 or 10.0.0.1-50',
                   prefixIcon: Icon(Icons.lan_outlined, size: 16),
@@ -1043,11 +1044,11 @@ class _ArpControlBarState extends State<ArpControlBar> {
                 onSubmitted: (val) => Navigator.of(ctx).pop(val.trim()),
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'Supported formats:\n• CIDR: 192.168.1.0/24, 10.101.1.0/26\n• Range: 192.168.1.1-192.168.1.50 or 192.168.1.1-50\n• Single Host: 192.168.1.10',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.white54,
+                  color: AppTheme.textSecondary,
                   height: 1.4,
                 ),
               ),

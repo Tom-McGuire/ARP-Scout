@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:network_suite_shared/network_suite_shared.dart';
 import 'package:arp_scout/data/services/oui/oui_lookup_service.dart';
+import 'package:arp_scout/ui/theme/app_theme.dart';
 
 class EditDeviceDialog extends StatefulWidget {
   const EditDeviceDialog({
@@ -115,7 +116,7 @@ class _EditDeviceDialogState extends State<EditDeviceDialog> {
     final isNewDevice = widget.macAddress.isEmpty;
 
     return Dialog(
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: AppTheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
@@ -137,10 +138,10 @@ class _EditDeviceDialogState extends State<EditDeviceDialog> {
                   Expanded(
                     child: Text(
                       isNewDevice ? 'Add Device to Shared Library' : 'Edit Device in Shared Library',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                       ),
                     ),
                   ),
@@ -172,9 +173,9 @@ class _EditDeviceDialogState extends State<EditDeviceDialog> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF252526),
+                    color: AppTheme.surfaceHigh,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF3E3E42)),
+                    border: Border.all(color: AppTheme.borderStrong),
                   ),
                   child: Row(
                     children: [
@@ -183,11 +184,11 @@ class _EditDeviceDialogState extends State<EditDeviceDialog> {
                       const Text('MAC: ', style: TextStyle(fontSize: 12, color: Colors.grey)),
                       Text(
                         widget.macAddress,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontFamily: 'monospace',
                           fontWeight: FontWeight.bold,
-                          color: Colors.white70,
+                          color: AppTheme.textPrimary,
                         ),
                       ),
                       if (widget.initialIp != null && widget.initialIp!.isNotEmpty) ...[
@@ -222,7 +223,7 @@ class _EditDeviceDialogState extends State<EditDeviceDialog> {
               // Category Selector Dropdown
               DropdownButtonFormField<String>(
                 initialValue: _selectedCategoryKey,
-                dropdownColor: const Color(0xFF252526),
+                dropdownColor: AppTheme.surfaceHigh,
                 decoration: const InputDecoration(
                   labelText: 'Device Category',
                   prefixIcon: Icon(Icons.category_outlined, size: 18),

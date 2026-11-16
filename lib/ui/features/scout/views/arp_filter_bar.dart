@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../domain/models/arp_filter.dart';
 import '../../../../domain/models/arp_host_record.dart';
 import '../../../../domain/models/host_status.dart';
+import '../../../theme/app_theme.dart';
 import '../view_models/arp_scout_view_model.dart';
 import 'dialogs/device_library_dialog.dart';
 import 'dialogs/edit_device_dialog.dart';
@@ -319,20 +320,20 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
                     ? FontWeight.bold
                     : FontWeight.normal,
                 color: isSelected
-                    ? Colors.white
+                    ? AppTheme.textPrimary
                     : (status == HostStatus.conflict && count > 0
-                          ? const Color(0xFFFCA5A5)
-                          : Colors.grey.shade400),
+                          ? AppTheme.error
+                          : AppTheme.textSecondary),
               ),
             ),
-            selectedColor: status.color.withValues(alpha: 0.35),
-            backgroundColor: const Color(0xFF252526),
+            selectedColor: status.color.withValues(alpha: 0.25),
+            backgroundColor: AppTheme.surfaceHigh,
             side: BorderSide(
               color: isSelected
                   ? status.color
                   : (status == HostStatus.conflict && count > 0
                         ? status.color.withValues(alpha: 0.6)
-                        : const Color(0xFF3E3E42)),
+                        : AppTheme.borderStrong),
               width: 1,
             ),
             onSelected: (_) => vm.toggleStatus(status),
@@ -405,13 +406,15 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected ? Colors.white : Colors.grey.shade400,
+                            color: isSelected
+                                ? AppTheme.textPrimary
+                                : AppTheme.textSecondary,
                           ),
                         ),
-                        selectedColor: catColor.withValues(alpha: 0.35),
-                        backgroundColor: const Color(0xFF252526),
+                        selectedColor: catColor.withValues(alpha: 0.25),
+                        backgroundColor: AppTheme.surfaceHigh,
                         side: BorderSide(
-                          color: isSelected ? catColor : const Color(0xFF3E3E42),
+                          color: isSelected ? catColor : AppTheme.borderStrong,
                           width: 1,
                         ),
                         onSelected: (_) => vm.toggleDevicePill(device.macAddress),
@@ -461,13 +464,17 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected ? Colors.white : Colors.grey.shade400,
+                              color: isSelected
+                                  ? AppTheme.textPrimary
+                                  : AppTheme.textSecondary,
                             ),
                           ),
-                          selectedColor: Colors.blueAccent.withValues(alpha: 0.35),
-                          backgroundColor: const Color(0xFF252526),
+                          selectedColor: Colors.blueAccent.withValues(alpha: 0.25),
+                          backgroundColor: AppTheme.surfaceHigh,
                           side: BorderSide(
-                            color: isSelected ? Colors.blueAccent : const Color(0xFF3E3E42),
+                            color: isSelected
+                                ? Colors.blueAccent
+                                : AppTheme.borderStrong,
                             width: 1,
                           ),
                           onSelected: (_) => vm.toggleDevicePill(host.macAddress),
@@ -486,8 +493,8 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
                     label: const Text('Manage', style: TextStyle(fontSize: 11)),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
-                    backgroundColor: const Color(0xFF252526),
-                    side: const BorderSide(color: Color(0xFF3E3E42), width: 1),
+                    backgroundColor: AppTheme.surfaceHigh,
+                    side: BorderSide(color: AppTheme.borderStrong, width: 1),
                     tooltip: 'Manage device library and visibility in ARP Scout',
                     onPressed: () => DeviceLibraryDialog.show(context),
                   ),
@@ -507,12 +514,12 @@ class _ArpFilterBarState extends State<ArpFilterBar> {
       decoration: BoxDecoration(
         color: vm.showAutoDetected
             ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
-            : const Color(0xFF252526),
+            : AppTheme.surfaceHigh,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: vm.showAutoDetected
               ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)
-              : const Color(0xFF3E3E42),
+              : AppTheme.borderStrong,
         ),
       ),
       child: Row(

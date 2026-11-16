@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:network_suite_shared/network_suite_shared.dart';
 import 'package:provider/provider.dart';
+
 import 'data/services/ipc/app_launch_arguments.dart';
 import 'data/services/ipc/inter_app_ipc_service.dart';
+import 'data/services/storage/suite_theme_sync_service.dart';
 import 'ui/features/scout/view_models/arp_scout_view_model.dart';
 import 'ui/features/scout/views/arp_scout_screen.dart';
 import 'ui/theme/app_theme.dart';
@@ -14,6 +18,9 @@ void main(List<String> args) async {
   } catch (e) {
     debugPrint('Shared database offline: $e');
   }
+
+  final initialMode = await SuiteThemeSyncService.getThemeMode();
+  AppTheme.isDark = (initialMode == 'dark');
 
   // Parse cold-start CLI args
   final cliArgs = AppLaunchArguments.parse(args);
@@ -41,7 +48,7 @@ void main(List<String> args) async {
   runApp(ArpScoutApp(viewModel: viewModel));
 }
 
-class ArpScoutApp extends StatelessWidget {
+class ArpScoutApp extends StatefulWidget {
   const ArpScoutApp({
     super.key,
     this.viewModel,
@@ -58,13 +65,51 @@ class ArpScoutApp extends StatelessWidget {
   final bool autoStart;
 
   @override
+  State<ArpScoutApp> createState() => _ArpScoutAppState();
+}
+
+class _ArpScoutAppState extends State<ArpScoutApp> {
+  StreamSubscription<void>? _dbSub;
+  String _themeMode = AppTheme.isDark ? 'dark' : 'light';
+
+  @override
+  void initState() {
+    super.initState();
+    _syncTheme();
+    _dbSub = SharedDeviceDatabase.instance.onDatabaseChanged.listen((_) {
+      _syncTheme();
+    });
+  }
+
+  Future<void> _syncTheme() async {
+    final mode = await SuiteThemeSyncService.getThemeMode();
+    if (mounted && mode != _themeMode) {
+      setState(() {
+        _themeMode = mode;
+        AppTheme.isDark = (mode == 'dark');
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _dbSub?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final effectiveVm = viewModel;
+    final effectiveVm = widget.viewModel;
     final app = MaterialApp(
       title: 'ARP & Subnet Scout',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme(),
-      home: const ArpScoutScreen(),
+      themeMode: AppTheme.isDark ? ThemeMode.dark : ThemeMode.light,
+      theme: AppTheme.lightTheme(),
+      darkTheme: AppTheme.darkTheme(),
+      home: KeyedSubtree(
+        key: ValueKey(_themeMode),
+        child: const ArpScoutScreen(),
+      ),
     );
 
     if (effectiveVm != null) {
@@ -76,10 +121,10 @@ class ArpScoutApp extends StatelessWidget {
 
     return ChangeNotifierProvider<ArpScoutViewModel>(
       create: (_) => ArpScoutViewModel(
-        initialSubnet: initialSubnet,
-        initialAdapterIp: initialAdapterIp,
-        initialAdapterName: initialAdapterName,
-        autoStart: autoStart,
+        initialSubnet: widget.initialSubnet,
+        initialAdapterIp: widget.initialAdapterIp,
+        initialAdapterName: widget.initialAdapterName,
+        autoStart: widget.autoStart,
       ),
       child: app,
     );
